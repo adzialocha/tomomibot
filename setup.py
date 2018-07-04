@@ -16,10 +16,10 @@ setup(name='tomomibot',
       author_email='kontakt@andreasdzialocha.com',
       url='https://github.com/adzialocha/tomomibot',
       license='MIT',
-      install_requires=[],
+      install_requires=['Click>=6.7'],
       packages=find_packages(),
       entry_points={
             'console_scripts': {
-                'tomomibot = tomomibot.__main__:main',
+                'tomomibot = tomomibot.cli:cli',
             }
       })
