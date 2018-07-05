@@ -16,7 +16,10 @@ setup(name='tomomibot',
       author_email='kontakt@andreasdzialocha.com',
       url='https://github.com/adzialocha/tomomibot',
       license='MIT',
-      install_requires=['Click>=6.7'],
+      install_requires=['Click>=6.7',
+                        'pyaudio>=0.2.11',
+                        'librosa>=0.6.1',
+                        'numpy>=1.14.5'],
       packages=find_packages(),
       entry_points={
             'console_scripts': {
