@@ -2,10 +2,7 @@ import click
 import pyaudio
 
 from tomomibot.cli import pass_context
-
-
-def line(symbol='-', length=48):
-    return ''.join([symbol for _ in range(48)])
+from tomomibot.utils import line
 
 
 def list_audio_devices(ctx):
