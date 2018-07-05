@@ -23,6 +23,13 @@ class Context(object):
         if self.verbose:
             self.log(msg, *args)
 
+    def elog(self, msg, *args):
+        """Logs an error message to stderr and exists."""
+        if args:
+            msg %= args
+        click.echo(click.style('Error: %s' % msg, fg='red'), file=sys.stderr)
+        sys.exit(1)
+
 
 commands_dir = os.path.abspath(os.path.join(
     os.path.dirname(__file__), 'commands'))

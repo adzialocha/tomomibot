@@ -11,16 +11,16 @@ from tomomibot.session import Session
 
 class Runtime:
 
-    def __init__(self, ctx, options):
+    def __init__(self, ctx, **kwargs):
         self.ctx = ctx
-        self.options = options
 
-        self._session = Session(self.ctx, self.options)
+        self._display_welcome()
+
+        self._session = Session(self.ctx, **kwargs)
         self._thread = None
 
     def initialize(self):
         self._init_signal()
-        self._display_welcome()
         self._session.start()
 
         # This is our main thread. Keep it alive!
