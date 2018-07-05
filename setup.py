@@ -19,6 +19,8 @@ setup(name='tomomibot',
       install_requires=['Click>=6.7',
                         'pyaudio>=0.2.11',
                         'librosa>=0.6.1',
+                        'scikit-learn>=0.19.1',
+                        'pysoundfile>=0.9.0',
                         'numpy>=1.14.5'],
       packages=find_packages(),
       entry_points={

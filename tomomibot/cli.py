@@ -66,3 +66,4 @@ class Console(click.MultiCommand):
 def cli(ctx, verbose):
     """Artificial intelligence bot for live voice improvisation."""
     ctx.verbose = verbose
+    # @TODO add health check here

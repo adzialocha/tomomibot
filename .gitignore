@@ -9,3 +9,6 @@ build/
 dist/
 *.egg-info/
 *.egg
+
+# Application data
+generated/

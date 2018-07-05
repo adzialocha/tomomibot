@@ -18,7 +18,7 @@ class Session():
         try:
             self._input = AudioInput(index_input=kwargs.get('input_ch', 0))
         except OSError as err:
-            ctx.elog('Selected audio channel does not have any inputs!')
+            self.ctx.elog('Selected audio channel does not have any inputs!')
 
         self._thread = threading.Thread(target=self.run, args=())
         self._thread.daemon = True
@@ -27,10 +27,7 @@ class Session():
 
     def start(self):
         # Start reading audio signal _input
-        try:
-            self._input.start()
-        except Error as err:
-            ctx.elog(err)
+        self._input.start()
 
         # Start thread
         self.is_running = True
@@ -54,7 +51,7 @@ class Session():
         self.ctx.vlog('Read %i frames' % frames.shape)
 
         # Detect onsets in available data
-        onsets = detect_onsets(frames,
-                               self.sample_rate,
-                               self.onset_threshold)
+        onsets, _ = detect_onsets(frames,
+                                  self.sample_rate,
+                                  self.onset_threshold)
         self.ctx.vlog('%i onsets detected' % len(onsets))

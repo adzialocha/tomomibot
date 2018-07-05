@@ -1,5 +1,7 @@
 import threading
 
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import MinMaxScaler
 import librosa
 import numpy as np
 import pyaudio
@@ -7,9 +9,58 @@ import pyaudio
 
 HOP_LENGTH = 512
 MSE_FRAME_LENGTH = 2048
+MIN_SAMPLE_MS = 100
 
 
-def detect_onsets(y, sr=44100, db_treshold=10):
+def pca(features, components=2):
+    pca = PCA(n_components=components)
+    transformed = pca.fit(features).transform(features)
+    variance = np.cumsum(
+        np.round(pca.explained_variance_ratio_, decimals=3) * 100)
+    scaler = MinMaxScaler()
+    scaler.fit(transformed)
+    return scaler.transform(transformed), variance, pca, scaler
+
+
+def mfcc_features(y, sr, n_mels=128, n_mfcc=13):
+    # Analyze only first second
+    y = y[0:sr]
+
+    # Calculate MFCCs (Mel-Frequency Cepstral Coefficients)
+    mel_spectrum = librosa.feature.melspectrogram(y,
+                                                  sr=sr,
+                                                  n_mels=n_mels)
+    log_spectrum = librosa.amplitude_to_db(mel_spectrum,
+                                           ref=np.max)
+    mfcc = librosa.feature.mfcc(S=log_spectrum,
+                                sr=sr,
+                                n_mfcc=n_mfcc)
+
+    # Standardize feature for equal variance
+    delta_mfcc = librosa.feature.delta(mfcc)
+    delta2_mfcc = librosa.feature.delta(mfcc, order=2)
+    feature_vector = np.concatenate((
+        np.mean(mfcc, 1),
+        np.mean(delta_mfcc, 1),
+        np.mean(delta2_mfcc, 1)))
+    feature_vector = (
+        feature_vector - np.mean(feature_vector)
+    ) / np.std(feature_vector)
+
+    return feature_vector
+
+
+def slice_audio(y, onsets, sr=44100, offset=0):
+    frames = []
+    for i in range(len(onsets) - 1):
+        start = onsets[i] * HOP_LENGTH
+        end = onsets[i + 1] * HOP_LENGTH
+        if end - start > (sr // 1000) * MIN_SAMPLE_MS:
+            frames.append([y[start:end], start + offset, end + offset])
+    return frames
+
+
+def detect_onsets(y, sr=44100, db_threshold=10):
     # Get the frame->beat strength profile
     onset_envelope = librosa.onset.onset_strength(y=y,
                                                   sr=sr,
@@ -38,9 +89,9 @@ def detect_onsets(y, sr=44100, db_treshold=10):
                              ref=np.median)
 
     # Filter out onsets which signals are too low
-    onsets = [o for o in onsets if db[o] > db_treshold]
+    onsets = [o for o in onsets if db[o] > db_threshold]
 
-    return times[onsets]
+    return onsets, times[onsets]
 
 
 class AudioInput():
