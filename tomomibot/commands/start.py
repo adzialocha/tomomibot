@@ -20,7 +20,7 @@ from tomomibot.runtime import Runtime
 @click.option('--output_channel',
               default=0,
               help='Index of channel for outgoing signal')
-@click.option('--sample_rate',
+@click.option('--samplerate',
               default=44100,
               help='Sample rate of audio signals')
 @click.option('--onset_threshold',

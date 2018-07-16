@@ -162,7 +162,7 @@ class AudioIO():
 
     def record(self):
         with self._input.recorder(self.samplerate,
-                channels=[self._input_ch]) as mic:
+                                  channels=[self._input_ch]) as mic:
             while self.is_running:
                 data = mic.record(self.buffersize)
                 self._frames = np.concatenate((self._frames, data))
