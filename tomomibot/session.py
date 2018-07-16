@@ -71,7 +71,7 @@ class Session():
         slices = slice_audio(frames, onsets)
         wavs = []
 
-        for i in range(len(slices) - 1):
+        for i in range(len(slices)):
             # Normalize slice audio signal
             y_slice = librosa.util.normalize(slices[i][0])
 
@@ -89,7 +89,7 @@ class Session():
 
         # @TODO Just play them for now, RNN model prediction later
         for wav in wavs:
-            self.ctx.vlog('Play .wav sample "{}"!'.format(wav))
+            self.ctx.vlog('▶ Play .wav sample "{}"'.format(wav))
             self._audio.play(wav)
 
         self._audio.flush()
