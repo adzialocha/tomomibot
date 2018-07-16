@@ -2,6 +2,7 @@ import click
 
 from tomomibot.cli import pass_context
 from tomomibot.runtime import Runtime
+from tomomibot.utils import check_valid_voice
 
 
 @click.command('start', short_help='Start a live session')
@@ -25,9 +26,15 @@ from tomomibot.runtime import Runtime
               help='Sample rate of audio signals')
 @click.option('--onset_threshold',
               default=10,
-              help='')
+              help='Ignore audio events under this dB value')
+@click.argument('voice')
 @pass_context
-def cli(ctx, **kwargs):
+def cli(ctx, voice, **kwargs):
     """Start a live session with tomomibot."""
-    runtime = Runtime(ctx, **kwargs)
-    runtime.initialize()
+    try:
+        check_valid_voice(voice)
+    except FileNotFoundError as err:
+        ctx.elog('Voice "{}" is invalid: {}'.format(voice, err))
+    else:
+        runtime = Runtime(ctx, **kwargs)
+        runtime.initialize()

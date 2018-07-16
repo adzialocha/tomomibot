@@ -8,9 +8,9 @@ import numpy as np
 import librosa
 
 from tomomibot.audio import detect_onsets, slice_audio, mfcc_features
+from tomomibot.const import GENERATED_FOLDER, DATA_FILE
 
 
-FOLDER_NAME = 'generated'
 BLOCK_SIZE = 1024 * 1024 * 2
 
 
@@ -30,13 +30,7 @@ def generate_voice(ctx, file, name, db_threshold=10):
                           dtype='float32')
     sr = sf.info(file).samplerate
 
-    # Create folder for generated files if it did not exist yet
-    base_dir = os.path.join(os.getcwd(), FOLDER_NAME)
-    if not os.path.isdir(base_dir):
-        ctx.log('Create missing %s folder in %s' % (FOLDER_NAME, base_dir))
-        os.mkdir(base_dir)
-
-    voice_dir = os.path.join(os.getcwd(), FOLDER_NAME, name)
+    voice_dir = os.path.join(os.getcwd(), GENERATED_FOLDER, name)
     if not os.path.isdir(voice_dir):
         os.mkdir(voice_dir)
     else:
@@ -88,7 +82,7 @@ def generate_voice(ctx, file, name, db_threshold=10):
     ctx.log('Created %i slices' % (counter - 1))
 
     # Generate and save data file
-    data_path = os.path.join(voice_dir, 'data.json')
+    data_path = os.path.join(voice_dir, DATA_FILE)
     with open(data_path, 'w') as file:
         json.dump(data, file, indent=2, separators=(',', ': '))
 

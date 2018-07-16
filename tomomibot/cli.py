@@ -3,6 +3,8 @@ import sys
 
 import click
 
+from tomomibot.utils import health_check
+
 
 CONTEXT_SETTINGS = dict(auto_envvar_prefix='COMPLEX')
 
@@ -66,4 +68,6 @@ class Console(click.MultiCommand):
 def cli(ctx, verbose):
     """Artificial intelligence bot for live voice improvisation."""
     ctx.verbose = verbose
-    # @TODO add health check here
+
+    # Make a startup health check to make sure everything is ready
+    health_check()
