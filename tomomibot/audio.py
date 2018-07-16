@@ -141,9 +141,9 @@ class AudioIO():
             raise IndexError(
                 'No output channel with index {} given'.format(channel_out))
 
-        ctx.log('input device "{}" @ channel #{}'.format(
+        ctx.log('Input device "{}" @ channel {}'.format(
             self._input.name, channel_in))
-        ctx.log('output device "{}" @ channel #{}'.format(
+        ctx.log('Output device "{}" @ channel {}'.format(
             self._output.name, channel_out))
 
         self._input_ch = channel_in
@@ -161,8 +161,7 @@ class AudioIO():
             return frames
 
     def record(self):
-        with self._input.recorder(
-                self.samplerate,
+        with self._input.recorder(self.samplerate,
                 channels=[self._input_ch]) as mic:
             while self.is_running:
                 data = mic.record(self.buffersize)
