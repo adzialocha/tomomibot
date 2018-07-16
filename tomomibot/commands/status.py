@@ -1,22 +1,31 @@
 import click
-import pyaudio
 
+from tomomibot.audio import all_inputs, all_outputs
 from tomomibot.cli import pass_context
 from tomomibot.utils import line
 
 
+def list_audio_channels(ctx, channels):
+    ctx.log(line())
+    ctx.log('{0:2} {1:8} {2:30}'.format(
+        ' #', 'Channels', 'Name'))
+    ctx.log(line())
+    for i, chn in enumerate(channels):
+        ctx.log('{0:2} {1:8} {2:30}'.format(
+            i,
+            chn.channels,
+            chn.name[:30]))
+
+
 def list_audio_devices(ctx):
-    ctx.log(click.style('Audio devices', bold=True))
-    audio = pyaudio.PyAudio()
-    ctx.log(line())
-    ctx.log('{0:2} {1:6} {2:7} {3:30}'.format(
-        ' #', 'Inputs', 'Outputs', 'Name'))
-    ctx.log(line())
-    for i in range(audio.get_device_count()):
-        info = audio.get_device_info_by_index(i)
-        ctx.log('{0:2d} {1:6d} {2:7d} {3:30}'.format(
-            info['index'], info['maxInputChannels'],
-            info['maxOutputChannels'], info['name'][:30]))
+    inputs = all_inputs()
+    outputs = all_outputs()
+
+    ctx.log(click.style('Audio input devices', bold=True))
+    list_audio_channels(ctx, inputs)
+    print()
+    ctx.log(click.style('Audio output devices', bold=True))
+    list_audio_channels(ctx, outputs)
 
 
 @click.command('status', short_help='Display system info and audio devices')

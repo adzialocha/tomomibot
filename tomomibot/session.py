@@ -3,7 +3,7 @@ import time
 
 import numpy as np
 
-from tomomibot.audio import AudioInput, detect_onsets
+from tomomibot.audio import AudioIO, detect_onsets
 
 
 class Session():
@@ -16,9 +16,13 @@ class Session():
         self.onset_threshold = kwargs.get('onset_threshold', 10)
 
         try:
-            self._input = AudioInput(index_input=kwargs.get('input_ch', 0))
-        except OSError as err:
-            self.ctx.elog('Selected audio channel does not have any inputs!')
+            self._audio = AudioIO(ctx,
+                                  device_in=kwargs.get('input_device', 0),
+                                  device_out=kwargs.get('output_device', 0),
+                                  channel_in=kwargs.get('input_channel', 0),
+                                  channel_out=kwargs.get('output_channel', 0))
+        except IndexError as err:
+            self.ctx.elog(err)
 
         self._thread = threading.Thread(target=self.run, args=())
         self._thread.daemon = True
@@ -27,7 +31,7 @@ class Session():
 
     def start(self):
         # Start reading audio signal _input
-        self._input.start()
+        self._audio.start()
 
         # Start thread
         self.is_running = True
@@ -35,7 +39,7 @@ class Session():
         self._thread.start()
 
     def stop(self):
-        self._input.stop()
+        self._audio.stop()
 
         self.is_running = False
 
@@ -47,7 +51,7 @@ class Session():
 
     def tick(self):
         # Read current frame buffer from input signal
-        frames = np.array(self._input.read_frames()).flatten()
+        frames = np.array(self._audio.read_frames()).flatten()
         self.ctx.vlog('Read %i frames' % frames.shape)
 
         # Detect onsets in available data

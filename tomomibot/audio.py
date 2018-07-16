@@ -4,7 +4,7 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import MinMaxScaler
 import librosa
 import numpy as np
-import pyaudio
+import soundcard as sc
 
 
 HOP_LENGTH = 512
@@ -94,7 +94,15 @@ def detect_onsets(y, sr=44100, db_threshold=10):
     return onsets, times[onsets]
 
 
-class AudioInput():
+def all_inputs():
+    return sc.all_microphones()
+
+
+def all_outputs():
+    return sc.all_speakers()
+
+
+class AudioIO():
     """Records data from an audio source.
 
     # Properties
@@ -103,44 +111,67 @@ class AudioInput():
         input_index
     """
 
-    def __init__(self, rate=44100, buffersize=1024, index_input=0):
-        self.rate = rate
+    def __init__(self, ctx, rate=44100, buffersize=1024,
+                 device_in=0, channel_in=0,
+                 device_out=0, channel_out=0):
+        self.ctx = ctx
+        self.samplerate = rate
         self.buffersize = buffersize
-        self.index_input = index_input
 
-        self.audio = pyaudio.PyAudio()
-        self.stream = self.audio.open(format=pyaudio.paFloat32,
-                                      channels=1,
-                                      rate=self.rate,
-                                      input=True,
-                                      input_device_index=self.index_input,
-                                      frames_per_buffer=self.buffersize,
-                                      stream_callback=self.stream_callback)
+        # Select audio devices and its channels
+        inputs = all_inputs()
+        outputs = all_outputs()
 
-        self.lock = threading.Lock()
+        if len(inputs) - 1 < device_in:
+            raise IndexError(
+                'No input device with index {} given'.format(device_in))
+
+        if len(outputs) - 1 < device_out:
+            raise IndexError(
+                'No output device with index {} given'.format(device_out))
+
+        self._input = sc.get_microphone(inputs[device_in].id)
+        self._output = sc.get_speaker(outputs[device_out].id)
+
+        if self._input.channels - 1 < channel_in:
+            raise IndexError(
+                'No input channel with index {} given'.format(channel_in))
+
+        if self._output.channels - 1 < channel_out:
+            raise IndexError(
+                'No output channel with index {} given'.format(channel_out))
+
+        ctx.log('input device "{}" @ channel #{}'.format(
+            self._input.name, channel_in))
+        ctx.log('output device "{}" @ channel #{}'.format(
+            self._output.name, channel_out))
+
+        self._input_ch = channel_in
+        self._output_ch = channel_out
+
+        # Prepare reading thread
+        self._lock = threading.Lock()
+        self._frames = np.array([])
         self.is_running = False
-        self.frames = []
-
-    def stream_callback(self, data, frame_count, time_info, status):
-        data = np.fromstring(data, 'float32')
-        with self.lock:
-            self.frames.append(data)
-            if not self.is_running:
-                return None, pyaudio.paComplete
-        return None, pyaudio.paContinue
 
     def read_frames(self):
-        with self.lock:
-            frames = self.frames
-            self.frames = []
+        with self._lock:
+            frames = self._frames
+            self._frames = np.array([])
             return frames
+
+    def record(self):
+        with self._input.recorder(
+                self.samplerate,
+                channels=[self._input_ch]) as mic:
+            while self.is_running:
+                data = mic.record(self.buffersize)
+                self._frames = np.concatenate((self._frames, data))
 
     def start(self):
         self.is_running = True
-        self.stream.start_stream()
+        threading.Thread(target=self.record).start()
 
     def stop(self):
-        with self.lock:
+        with self._lock:
             self.is_running = False
-        self.stream.close()
-        self.audio.terminate()

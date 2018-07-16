@@ -8,12 +8,18 @@ from tomomibot.runtime import Runtime
 @click.option('--interval',
               default=3,
               help='Interval (in seconds) of analyzing incoming live signal')
-@click.option('--input_ch',
+@click.option('--input_device',
               default=0,
-              help='Index of audio device channel for incoming audio (mono)')
-@click.option('--output_ch',
-              default=1,
-              help='Index of audio device channel for outgoing audio (mono)')
+              help='Index of audio device for incoming signal')
+@click.option('--output_device',
+              default=0,
+              help='Index of audio device for outgoing signal')
+@click.option('--input_channel',
+              default=0,
+              help='Index of channel for incoming signal')
+@click.option('--output_channel',
+              default=0,
+              help='Index of channel for outgoing signal')
 @click.option('--sample_rate',
               default=44100,
               help='Sample rate of audio signals')
