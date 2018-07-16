@@ -111,11 +111,11 @@ class AudioIO():
         input_index
     """
 
-    def __init__(self, ctx, rate=44100, buffersize=1024,
+    def __init__(self, ctx, samplerate=44100, buffersize=1024,
                  device_in=0, channel_in=0,
                  device_out=0, channel_out=0):
         self.ctx = ctx
-        self.samplerate = rate
+        self.samplerate = samplerate
         self.buffersize = buffersize
 
         # Select audio devices and its channels
