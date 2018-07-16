@@ -1,6 +1,5 @@
 import json
 import os
-import warnings
 
 import click
 import soundfile as sf
@@ -12,12 +11,6 @@ from tomomibot.const import GENERATED_FOLDER, DATA_FILE
 
 
 BLOCK_SIZE = 1024 * 1024 * 2
-
-
-# Ignore LAPACK warning (https://github.com/scipy/scipy/issues/5998)
-warnings.filterwarnings(action='ignore',
-                        module='scipy',
-                        message='^internal gelsd')
 
 
 def generate_voice(ctx, file, name, db_threshold=10):

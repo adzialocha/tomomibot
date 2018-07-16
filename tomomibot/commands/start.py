@@ -36,5 +36,5 @@ def cli(ctx, voice, **kwargs):
     except FileNotFoundError as err:
         ctx.elog('Voice "{}" is invalid: {}'.format(voice, err))
     else:
-        runtime = Runtime(ctx, **kwargs)
+        runtime = Runtime(ctx, voice, **kwargs)
         runtime.initialize()

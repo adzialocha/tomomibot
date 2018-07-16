@@ -16,6 +16,11 @@ def health_check():
         os.mkdir(base_dir)
 
 
+def make_wav_path(name, wav_id):
+    voice_dir = os.path.join(os.getcwd(), GENERATED_FOLDER, name)
+    return os.path.join(voice_dir, '{}.wav'.format(wav_id))
+
+
 def check_valid_voice(name):
     """Checks if a voice is given and contains all needed files"""
     voice_dir = os.path.join(os.getcwd(), GENERATED_FOLDER, name)
@@ -29,7 +34,7 @@ def check_valid_voice(name):
 
     with open(voice_data_file) as file:
         for entry in json.load(file):
-            wav_path = os.path.join(voice_dir, '{}.wav'.format(entry['id']))
+            wav_path = make_wav_path(name, entry['id'])
             if not os.path.isfile(wav_path):
                 raise FileNotFoundError(
                     'Could not find wav file "{}" in voice folder'.format(

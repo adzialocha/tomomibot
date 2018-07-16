@@ -2,17 +2,18 @@ import threading
 import time
 
 import numpy as np
+import librosa
 
-from tomomibot.audio import AudioIO, detect_onsets
+from tomomibot.audio import AudioIO, detect_onsets, slice_audio, mfcc_features
 
 
 class Session():
 
-    def __init__(self, ctx, **kwargs):
+    def __init__(self, ctx, voice, **kwargs):
         self.ctx = ctx
 
         self.samplerate = kwargs.get('samplerate', 44100)
-        self.interval = kwargs.get('interval', 3)
+        self.interval = kwargs.get('interval', 1)
         self.onset_threshold = kwargs.get('onset_threshold', 10)
 
         try:
@@ -27,8 +28,13 @@ class Session():
 
         self._thread = threading.Thread(target=self.run, args=())
         self._thread.daemon = True
-
         self.is_running = False
+
+        self._voice = voice
+
+        self.ctx.log('Voice "{}" with {} points'
+                     .format(voice.name, len(voice._pca_points)))
+        self.ctx.log('')
 
     def start(self):
         # Start reading audio signal _input
@@ -60,3 +66,31 @@ class Session():
                                   self.samplerate,
                                   self.onset_threshold)
         self.ctx.vlog('%i onsets detected' % len(onsets))
+
+        # Slice audio into parts, only take long enough ones
+        slices = slice_audio(frames, onsets)
+        wavs = []
+
+        for i in range(len(slices) - 1):
+            # Normalize slice audio signal
+            y_slice = librosa.util.normalize(slices[i][0])
+
+            # Calculate MFCCs
+            mfcc = mfcc_features(y_slice, self.samplerate)
+
+            # Project point into given voice PCA space
+            point = self._voice.project(mfcc)
+
+            # Find closest sound to this one
+            wav = self._voice.find_wav(point)
+            wavs.append(wav)
+
+        self.ctx.vlog('%i slices generated' % len(slices))
+
+        # @TODO Just play them for now, RNN model prediction later
+        for wav in wavs:
+            self.ctx.vlog('Play .wav sample "{}"!'.format(wav))
+            self._audio.play(wav)
+
+        self._audio.flush()
+        self.ctx.vlog('')

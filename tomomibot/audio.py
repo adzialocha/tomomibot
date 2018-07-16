@@ -5,6 +5,7 @@ from sklearn.preprocessing import MinMaxScaler
 import librosa
 import numpy as np
 import soundcard as sc
+import soundfile as sf
 
 
 HOP_LENGTH = 512
@@ -13,16 +14,16 @@ MIN_SAMPLE_MS = 100
 
 
 def pca(features, components=2):
+    """Dimension reduction via Principal Component Analysis (PCA)"""
     pca = PCA(n_components=components)
     transformed = pca.fit(features).transform(features)
-    variance = np.cumsum(
-        np.round(pca.explained_variance_ratio_, decimals=3) * 100)
     scaler = MinMaxScaler()
     scaler.fit(transformed)
-    return scaler.transform(transformed), variance, pca, scaler
+    return scaler.transform(transformed), pca, scaler
 
 
 def mfcc_features(y, sr, n_mels=128, n_mfcc=13):
+    """Extract MFCCs (Mel-Frequency Cepstral Coefficients)"""
     # Analyze only first second
     y = y[0:sr]
 
@@ -157,8 +158,11 @@ class AudioIO():
     def read_frames(self):
         with self._lock:
             frames = self._frames
-            self._frames = np.array([])
+            self.flush()
             return frames
+
+    def flush(self):
+        self._frames = np.array([])
 
     def record(self):
         with self._input.recorder(self.samplerate,
@@ -166,6 +170,12 @@ class AudioIO():
             while self.is_running:
                 data = mic.record(self.buffersize)
                 self._frames = np.concatenate((self._frames, data))
+
+    def play(self, wav_path):
+        data, _ = sf.read(wav_path)
+        with self._output.player(self.samplerate,
+                                 channels=[self._output_ch]) as speaker:
+            speaker.play(data)
 
     def start(self):
         self.is_running = True

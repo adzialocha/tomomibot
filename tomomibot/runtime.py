@@ -7,16 +7,18 @@ import click
 
 from tomomibot import __version__
 from tomomibot.session import Session
+from tomomibot.voice import Voice
 
 
 class Runtime:
 
-    def __init__(self, ctx, **kwargs):
+    def __init__(self, ctx, voice_name, **kwargs):
         self.ctx = ctx
 
         self._display_welcome()
 
-        self._session = Session(self.ctx, **kwargs)
+        voice = Voice(voice_name)
+        self._session = Session(self.ctx, voice, **kwargs)
         self._thread = None
 
     def initialize(self):
