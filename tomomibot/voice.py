@@ -25,7 +25,7 @@ class Voice:
 
             # Calculate PCA
             pca_points, pca_instance, pca_scaler = pca(self.mfccs)
-            self._pca_points = pca_points
+            self.points = pca_points
             self._pca_instance = pca_instance
             self._pca_scaler = pca_scaler
 
@@ -34,13 +34,16 @@ class Voice:
         point = self._pca_instance.transform([mfcc])
         return self._pca_scaler.transform(point)[0]
 
+    def project_voice(self, voice):
+        """Project all points of a voice into given PCA space"""
+        points = []
+        for point in voice.mfccs:
+            points.append(self.project(point))
+        return points
+
     def find_wav(self, point):
         """Find closest point and return its wav file path"""
         deltas = self._pca_points - point
         dist_2 = np.einsum('ij,ij->i', deltas, deltas)
         index = np.argmin(dist_2)
         return self.wavs[index]
-
-    def generate_sequence(self):
-        # @TODO Implement this
-        pass

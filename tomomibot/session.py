@@ -33,7 +33,7 @@ class Session():
         self._voice = voice
 
         self.ctx.log('Voice "{}" with {} points'
-                     .format(voice.name, len(voice._pca_points)))
+                     .format(voice.name, len(voice.points)))
         self.ctx.log('')
 
     def start(self):
