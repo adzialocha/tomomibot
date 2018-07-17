@@ -19,13 +19,10 @@ setup(name='tomomibot',
       install_requires=['Click>=6.7',
                         'librosa>=0.6.1',
                         'numpy>=1.14.5',
-                        'SoundCard==0.1.2',
+                        'SoundCard>=0.1.2',
                         'pysoundfile>=0.9.0',
                         'scikit-learn>=0.19.1'],
       packages=find_packages(),
-      dependency_links=[
-        'git+https://github.com/bastibe/SoundCard.git#egg=SoundCard-0.1.2',
-      ],
       entry_points={
             'console_scripts': {
                 'tomomibot = tomomibot.cli:cli',
