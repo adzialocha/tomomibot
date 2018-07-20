@@ -11,4 +11,5 @@ dist/
 *.egg
 
 # Application data
-generated/
+models/
+voices/

@@ -1,3 +1,5 @@
-DATA_FILE = 'data.json'
-GENERATED_FOLDER = 'generated'
-SILENCE_POINT = [1.0, 1.0]
+GENERATED_FOLDER = 'voices'
+MODELS_FOLDER = 'models'
+ONSET_FILE = 'onset.json'
+SEQUENCE_FILE = 'sequence.json'
+SILENCE_POINT = [0.0, 0.0]

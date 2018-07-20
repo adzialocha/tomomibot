@@ -8,18 +8,14 @@ import soundfile as sf
 
 
 from tomomibot.audio import detect_onsets, slice_audio, mfcc_features
-from tomomibot.const import GENERATED_FOLDER, DATA_FILE, SILENCE_POINT
+from tomomibot.const import (
+    GENERATED_FOLDER, SEQUENCE_FILE, ONSET_FILE, SILENCE_POINT)
 
 
-PRECISION = 5
-
-
-def round_point(point, precision):
-    """Helper to round floats in point vector"""
-    return [round(x, precision) for x in point]
-
-
-def generate_voice(ctx, file, name, db_threshold=10, block=120):
+def generate_voice(ctx, file, name,
+                   db_threshold=10,
+                   block=120,
+                   block_per_second=10):
     """Generate voice based on .wav file"""
 
     # Extract information about sound file
@@ -44,6 +40,7 @@ def generate_voice(ctx, file, name, db_threshold=10, block=120):
     counter = 1
     block_no = 0
     data = []
+    sequence = []
 
     ctx.log('Analyze .wav file "%s" with %i frames and sample rate %i' % (
         click.format_filename(file, shorten=True),
@@ -82,63 +79,61 @@ def generate_voice(ctx, file, name, db_threshold=10, block=120):
                 librosa.output.write_wav(path, y_slice, sr)
                 counter += 1
 
+            # Additionally, generate a sequence for training
+            block_size = sr // block_per_second
+            start = 0
+            end = block_size
+
+            while end <= len(y):
+                y_slice = y[start:end]
+                melfc = mfcc_features(y_slice, sr)
+                sequence.append(melfc.tolist())
+                start += block_size
+                end += block_size
+
             block_no += 1
             bar.update(1)
 
     ctx.log('Created %i slices' % (counter - 1))
 
-    # Generate and save data file
-    data_path = os.path.join(voice_dir, DATA_FILE)
+    # generate and save data file
+    data_path = os.path.join(voice_dir, ONSET_FILE)
     with open(data_path, 'w') as file:
         json.dump(data, file, indent=2, separators=(',', ': '))
+    ctx.log('saved .json file with analyzed data.')
 
-    ctx.log('Saved .json file with analyzed data.')
+    # ... and save sequence file
+    data_path = os.path.join(voice_dir, SEQUENCE_FILE)
+    with open(data_path, 'w') as file:
+        json.dump(sequence, file, indent=2, separators=(',', ': '))
+    ctx.log('saved .json file with sequence.')
 
 
-def generate_sequence(ctx, voice_primary, voice_secondary):
+def generate_training_data(ctx, voice_primary, voice_secondary):
     """Generate a trainable sequence of two voices playing together"""
-    sequence = []
+    training_data = []
 
-    ctx.log('Generate a trainable sequence')
-    ctx.log('Primary voice: "{}"'.format(voice_primary.name))
-    ctx.log('Secondary voice: "{}"'.format(voice_secondary.name))
+    # Project both sequences into the primary voice PCA space
+    sequence_primary = voice_primary.project(voice_primary.sequence)
+    sequence_secondary = voice_primary.project(voice_secondary.sequence)
 
-    # Project secondary voice points into the primary voice PCA space
-    points_secondary = voice_primary.project_voice(voice_secondary)
+    # Generate sequence
+    sequence_len = max(len(sequence_primary), len(sequence_secondary))
+    for i in range(sequence_len):
+        frame = []
+        if i < len(sequence_primary):
+            frame.append([sequence_primary[i][0], sequence_primary[i][1]])
+        else:
+            frame.append(SILENCE_POINT)
 
-    counter = 0
+        if i < len(sequence_secondary):
+            frame.append([sequence_secondary[i][0], sequence_secondary[i][1]])
+        else:
+            frame.append(SILENCE_POINT)
 
-    # Go through all secondary sound events
-    with click.progressbar(length=len(points_secondary),
-                           label='Progress') as bar:
-        for i, point in enumerate(points_secondary):
-            start = voice_secondary.positions[i][0]
-            end = voice_secondary.positions[i][1]
+        training_data.append(frame)
 
-            # Find a simultaneous sound event in primary voice
-            found_point = None
-            for j, point_primary in reversed(
-                    list(enumerate(voice_primary.points))):
-                start_primary = voice_primary.positions[j][0]
-                end_primary = voice_primary.positions[j][1]
-                if not (end <= start_primary or start >= end_primary):
-                    found_point = point_primary.tolist()
-                    counter += 1
-                    break
+    ctx.log('Sequence with {} events generated.'.format(
+        sequence_len))
 
-            # Set silence marking point when nothing was played
-            if found_point is None:
-                found_point = SILENCE_POINT
-
-            # Add played point to other
-            sequence.append([
-                round_point(point.tolist(), PRECISION),
-                round_point(found_point, PRECISION)])
-
-            bar.update(1)
-
-    ctx.log('Sequence with {} events and {} targets generated.'.format(
-        len(points_secondary),
-        counter))
-
-    return sequence
+    return training_data
