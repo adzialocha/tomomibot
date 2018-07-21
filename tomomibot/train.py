@@ -12,6 +12,12 @@ from tomomibot.utils import line
 from tomomibot.voice import Voice
 
 
+def reweight_distribution(original_distribution, temperature):
+    distribution = np.log(original_distribution) / temperature
+    distribution = np.exp(distribution)
+    return distribution / np.sum(distribution)
+
+
 def encode_point(p, grid_size):
     return [min(round(grid_size * max(f, 0)), grid_size - 1) for f in p]
 

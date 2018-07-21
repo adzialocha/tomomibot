@@ -12,13 +12,13 @@ from tomomibot.voice import Voice
 
 class Runtime:
 
-    def __init__(self, ctx, voice_name, **kwargs):
+    def __init__(self, ctx, voice_name, model, **kwargs):
         self.ctx = ctx
 
         self._display_welcome()
 
         voice = Voice(voice_name)
-        self._session = Session(self.ctx, voice, **kwargs)
+        self._session = Session(self.ctx, voice, model, **kwargs)
         self._thread = None
 
     def initialize(self):

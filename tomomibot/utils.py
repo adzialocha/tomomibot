@@ -26,6 +26,14 @@ def make_wav_path(name, wav_id):
     return os.path.join(voice_dir, '{}.wav'.format(wav_id))
 
 
+def check_valid_model(name):
+    """Checks if a model is given"""
+    model_file = os.path.join(os.getcwd(), MODELS_FOLDER, '{}.h5'.format(name))
+    if not os.path.isfile(model_file):
+        raise FileNotFoundError('Could not find {} in model folder'.format(
+            name))
+
+
 def check_valid_voice(name):
     """Checks if a voice is given and contains all needed files"""
     voice_dir = os.path.join(os.getcwd(), GENERATED_FOLDER, name)

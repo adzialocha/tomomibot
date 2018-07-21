@@ -12,10 +12,26 @@ from tomomibot.const import (
     GENERATED_FOLDER, SEQUENCE_FILE, ONSET_FILE, SILENCE_POINT)
 
 
+def analyze_sequence(y, sr, blocks_per_second):
+    sequence = []
+    block_size = sr // blocks_per_second
+    start = 0
+    end = block_size
+
+    while end <= len(y):
+        y_slice = y[start:end]
+        melfc = mfcc_features(y_slice, sr)
+        sequence.append(melfc.tolist())
+        start += block_size
+        end += block_size
+
+    return sequence
+
+
 def generate_voice(ctx, file, name,
                    db_threshold=10,
                    block=120,
-                   block_per_second=10):
+                   blocks_per_second=10):
     """Generate voice based on .wav file"""
 
     # Extract information about sound file
@@ -80,16 +96,7 @@ def generate_voice(ctx, file, name,
                 counter += 1
 
             # Additionally, generate a sequence for training
-            block_size = sr // block_per_second
-            start = 0
-            end = block_size
-
-            while end <= len(y):
-                y_slice = y[start:end]
-                melfc = mfcc_features(y_slice, sr)
-                sequence.append(melfc.tolist())
-                start += block_size
-                end += block_size
+            sequence += analyze_sequence(y, sr, blocks_per_second)
 
             block_no += 1
             bar.update(1)

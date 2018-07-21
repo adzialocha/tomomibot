@@ -41,7 +41,7 @@ class Voice:
 
     def find_wav(self, point):
         """Find closest point and return its wav file path"""
-        deltas = self._pca_points - point
+        deltas = self.points - point
         dist_2 = np.einsum('ij,ij->i', deltas, deltas)
         index = np.argmin(dist_2)
         return self.wavs[index]

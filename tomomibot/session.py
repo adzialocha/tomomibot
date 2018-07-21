@@ -1,20 +1,30 @@
+import os
+
 import threading
 import time
 
+from keras.models import load_model
+import tensorflow as tf
 import numpy as np
-import librosa
 
-from tomomibot.audio import AudioIO, detect_onsets, slice_audio, mfcc_features
+from tomomibot.audio import AudioIO
+from tomomibot.const import MODELS_FOLDER
+from tomomibot.generate import analyze_sequence
+from tomomibot.train import encode_data, decode_data, reweight_distribution
 
 
 class Session():
 
-    def __init__(self, ctx, voice, **kwargs):
+    def __init__(self, ctx, voice, model, **kwargs):
         self.ctx = ctx
 
-        self.samplerate = kwargs.get('samplerate', 44100)
+        self.blocks_per_second = kwargs.get('blocks_per_second', 10)
         self.interval = kwargs.get('interval', 1)
         self.onset_threshold = kwargs.get('onset_threshold', 10)
+        self.samplerate = kwargs.get('samplerate', 44100)
+        self.grid_size = kwargs.get('grid_size', 10)
+        self.seq_len = kwargs.get('seq_len', 10)
+        self.temperature = kwargs.get('temperature', 1.0)
 
         try:
             self._audio = AudioIO(ctx,
@@ -32,7 +42,14 @@ class Session():
 
         self._voice = voice
 
-        self.ctx.log('Voice "{}" with {} points'
+        # Load model & make it ready for being used in another thread
+        model_name = '{}.h5'.format(model)
+        model_path = os.path.join(os.getcwd(), MODELS_FOLDER, model_name)
+        self._model = load_model(model_path)
+        self._model._make_predict_function()
+        self._graph = tf.get_default_graph()
+
+        self.ctx.log('Voice "{}" with {} samples'
                      .format(voice.name, len(voice.points)))
         self.ctx.log('')
 
@@ -61,36 +78,34 @@ class Session():
         frames = np.array(self._audio.read_frames()).flatten()
         self.ctx.vlog('Read %i frames' % frames.shape)
 
-        # Detect onsets in available data
-        onsets, _ = detect_onsets(frames,
-                                  self.samplerate,
-                                  self.onset_threshold)
-        self.ctx.vlog('%i onsets detected' % len(onsets))
+        # Slice audio in smaller pieces and analyse MFCCs
+        mfccs = analyze_sequence(frames,
+                                 self.samplerate,
+                                 self.blocks_per_second)
 
-        # Slice audio into parts, only take long enough ones
-        slices = slice_audio(frames, onsets)
-        wavs = []
+        # Project points into given voice PCA space
+        points = self._voice.project(mfccs)
 
-        for i in range(len(slices)):
-            # Normalize slice audio signal
-            y_slice = librosa.util.normalize(slices[i][0])
+        # Encode sequence for trained model, take sample from end
+        encoded = encode_data([points], self.grid_size)[0][:self.seq_len]
 
-            # Calculate MFCCs
-            mfcc = mfcc_features(y_slice, self.samplerate)
+        # Predict next action via model
+        with self._graph.as_default():
+            result = self._model.predict(np.array([encoded]))
 
-            # Project point into given voice PCA space
-            point = self._voice.project(mfcc)
+            # Reweight the softmax distribution
+            result_reweighted = reweight_distribution(result, self.temperature)
+            result_class = np.argmax(result_reweighted)
 
-            # Find closest sound to this one
-            wav = self._voice.find_wav(point)
-            wavs.append(wav)
+            # Decode to a position in PCA space
+            position = decode_data([[result_class]], self.grid_size).flatten()
+            self.ctx.vlog('Model predicted point {}'.format(position))
 
-        self.ctx.vlog('%i slices generated' % len(slices))
-
-        # @TODO Just play them for now, RNN model prediction later
-        for wav in wavs:
+        # Find closest sound to this point
+        wav = self._voice.find_wav(position)
+        if wav is not None:
             self.ctx.vlog('▶ Play .wav sample "{}"'.format(wav))
             self._audio.play(wav)
+            self._audio.flush()
 
-        self._audio.flush()
         self.ctx.vlog('')

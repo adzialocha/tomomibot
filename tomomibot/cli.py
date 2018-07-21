@@ -14,6 +14,9 @@ warnings.filterwarnings(action='ignore',
                         module='scipy',
                         message='^internal gelsd')
 
+# Disable debugging logs of tensorflow
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 
 class Context(object):
 
