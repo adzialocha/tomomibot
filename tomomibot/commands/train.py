@@ -6,11 +6,11 @@ from tomomibot.utils import check_valid_voice
 
 
 @click.command('train', short_help='Train a model for sequence prediction')
-@click.option('--grid_size',
+@click.option('--num_classes',
               default=10,
-              help='Reduce the possible points in the PCA space with a grid')
+              help='Number of classes to cluster the dataset (k-means)')
 @click.option('--batch_size',
-              default=128,
+              default=64,
               help='How many batches to train per step')
 @click.option('--data_split',
               default=0.2,
@@ -19,10 +19,10 @@ from tomomibot.utils import check_valid_voice
               default=10,
               help='Length of a point sequence to learn')
 @click.option('--epochs',
-              default=10,
+              default=75,
               help='How many training epochs')
 @click.option('--num_layers',
-              default=3,
+              default=1,
               help='Number of hidden LSTM layers in neural network')
 @click.option('--num_units',
               default=256,

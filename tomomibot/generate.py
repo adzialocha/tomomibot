@@ -141,7 +141,7 @@ def generate_training_data(ctx, voice_primary, voice_secondary):
     sequence_secondary = voice_primary.project(voice_secondary.sequence)
 
     # Generate sequence
-    sequence_len = max(len(sequence_primary), len(sequence_secondary))
+    sequence_len = min(len(sequence_primary), len(sequence_secondary))
     for i in range(sequence_len):
         frame = []
         if i < len(sequence_primary):
@@ -158,5 +158,11 @@ def generate_training_data(ctx, voice_primary, voice_secondary):
 
     ctx.log('Sequence with {} events generated.'.format(
         sequence_len))
+
+    # ... and save sequence file
+    data_path = os.path.join(os.getcwd(), SEQUENCE_FILE)
+    with open(data_path, 'w') as file:
+        json.dump(training_data, file, indent=2, separators=(',', ': '))
+    ctx.log('saved .json file with sequence.')
 
     return np.array(training_data)

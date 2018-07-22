@@ -83,10 +83,10 @@ def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
     data_split = kwargs.get('data_split', 0.2)
     seq_len = kwargs.get('seq_len', 10)
 
-    dropout = kwargs.get('droput', 0.1)
+    dropout = kwargs.get('dropout', 0.1)
     epochs = kwargs.get('epochs', 75)
-    num_layers = kwargs.get('num_layers', 3)
-    num_units = kwargs.get('num_units', 8)
+    num_layers = kwargs.get('num_layers', 1)
+    num_units = kwargs.get('num_units', 256)
 
     ctx.log('\nParameters:')
     ctx.log(line(length=32))

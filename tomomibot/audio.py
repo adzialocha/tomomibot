@@ -37,6 +37,9 @@ def mfcc_features(y, sr, n_mels=128, n_mfcc=13):
                                 sr=sr,
                                 n_mfcc=n_mfcc)
 
+    if not mfcc.any():
+        return np.zeros(n_mfcc * 3)
+
     # Standardize feature for equal variance
     delta_mfcc = librosa.feature.delta(mfcc)
     delta2_mfcc = librosa.feature.delta(mfcc, order=2)
