@@ -13,3 +13,4 @@ dist/
 # Application data
 models/
 voices/
+sequence.json
