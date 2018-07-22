@@ -20,6 +20,11 @@ def add_noise(point, factor=0.01):
                     point[1] + random.uniform(-factor, factor))
 
 
+def chunks(l, n):
+    n = max(1, n)
+    return (l[i:i+n] for i in range(0, len(l), n))
+
+
 class Session():
 
     def __init__(self, ctx, voice, model, **kwargs):
@@ -87,6 +92,8 @@ class Session():
                 self.tick()
 
     def tick(self):
+        wavs = []
+
         # Read current frame buffer from input signal
         frames = np.array(self._audio.read_frames()).flatten()
         self.ctx.vlog('Read %i frames' % frames.shape)
@@ -97,34 +104,48 @@ class Session():
                                  self.blocks_per_second,
                                  threshold=self.threshold)
 
+        if len(mfccs) < self.seq_len:
+            self.ctx.log('Not enough data!\n')
+            return
+
         # Project points into given voice PCA space
         points = self._voice.project(mfccs)
 
         # Encode sequence for trained model, take sample from end
         encoded = self._kmeans.predict(points)
-        encoded = encoded[:self.seq_len]
 
-        # Predict next action via model
-        with self._graph.as_default():
-            result = self._model.predict(np.array([encoded]))
+        # Slice it up in separate sequences
+        sequences = chunks(encoded, self.seq_len)
+        for sequence in sequences:
+            if len(sequence) < self.seq_len:
+                break
 
-            # Reweight the softmax distribution
-            result_reweighted = reweight_distribution(result, self.temperature)
-            result_class = np.argmax(result_reweighted)
+            with self._graph.as_default():
+                # Predict next action via model
+                result = self._model.predict(np.array([sequence]))
 
-            # Decode to a position in PCA space
-            position = k_means_decode_data([[result_class]], self._kmeans)
-            position = position.flatten()
-            position = add_noise(position, self.noise_factor)
-            self.ctx.vlog('Model predicted point {} in cluster {}'.format(
-                position,
-                result_class))
+                # Reweight the softmax distribution
+                result_reweighted = reweight_distribution(result,
+                                                          self.temperature)
+                result_class = np.argmax(result_reweighted)
+
+                # Decode to a position in PCA space
+                position = k_means_decode_data([[result_class]], self._kmeans)
+                position = position.flatten()
+                position = add_noise(position, self.noise_factor)
+                self.ctx.vlog('Model predicted point {} in cluster {}'.format(
+                    position,
+                    result_class))
+
+                # Find closest sound to this point
+                wavs.append(self._voice.find_wav(position))
 
         # Find closest sound to this point
-        wav = self._voice.find_wav(position)
-        if wav is not None:
+        for wav in wavs:
             self.ctx.vlog('▶ Play .wav sample "{}"'.format(wav))
             self._audio.play(wav)
+
+        if len(wavs) > 0:
             self._audio.flush()
 
         self.ctx.vlog('')
