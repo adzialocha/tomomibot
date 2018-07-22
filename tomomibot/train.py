@@ -3,6 +3,7 @@ import sys
 
 from keras import layers
 from keras.models import Sequential, load_model
+from sklearn.cluster import KMeans
 import click
 import numpy as np
 
@@ -18,42 +19,26 @@ def reweight_distribution(original_distribution, temperature):
     return distribution / np.sum(distribution)
 
 
-def encode_point(p, grid_size):
-    return [min(round(grid_size * max(f, 0)), grid_size - 1) for f in p]
-
-
-def decode_point(p, grid_size):
-    return [f / grid_size for f in p]
-
-
-def encode_data(data, grid_size):
-    """Encode 2D positions into a grid and convert this to index values"""
+def k_means_encode_data(data, num_clusters):
+    kmeans = KMeans(n_clusters=num_clusters)
+    kmeans.fit(data[:, 0])
     new_data = []
-    m = np.zeros((grid_size, grid_size))
     for column in data:
         new_column = []
         for point in column:
-            ac_converted = np.array(
-                encode_point(point, grid_size),
-                dtype='int32')
-            ac_indexed = np.ravel_multi_index(ac_converted, m.shape)
-            new_column.append(ac_indexed)
+            predicted = kmeans.predict([point])[0]
+            new_column.append(predicted)
         new_data.append(new_column)
-    return np.array(new_data)
+    return np.array(new_data), kmeans
 
 
-def decode_data(data, grid_size):
-    """Decode indexed grid positions to (x, y) float values"""
+def k_means_decode_data(data, kmeans):
     new_data = []
-    m = np.zeros((grid_size, grid_size))
     for column in data:
         new_column = []
-        for ac_converted in column:
-            unraveled = np.unravel_index(ac_converted, m.shape)
-            point = np.array(
-                decode_point(unraveled, grid_size),
-                dtype='float32')
-            new_column.append(point)
+        for cluster_index in column:
+            center = kmeans.cluster_centers_[cluster_index]
+            new_column.append(center)
         new_data.append(new_column)
     return np.array(new_data)
 
@@ -73,8 +58,8 @@ def generator(data, seq_len, min_index, max_index, batch_size):
         for j, _ in enumerate(rows):
             indices = range(rows[j], rows[j] + seq_len)
             if indices[-1] < max_index:
-                samples[j] = data[:, 0][indices]
-                targets[j] = data[:, 1][indices][-1]
+                targets[j] = data[:, 0][indices][-1]
+                samples[j] = data[:, 1][indices]
 
         yield samples, targets
 
@@ -92,20 +77,21 @@ def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
         resume = True
 
     # Parameters and Hyperparameters
-    grid_size = kwargs.get('grid_size', 10)
+    num_classes = kwargs.get('num_classes', 10)
 
-    batch_size = kwargs.get('batch_size', 128)
+    batch_size = kwargs.get('batch_size', 64)
     data_split = kwargs.get('data_split', 0.2)
     seq_len = kwargs.get('seq_len', 10)
 
-    epochs = kwargs.get('epochs', 10)
+    dropout = kwargs.get('droput', 0.1)
+    epochs = kwargs.get('epochs', 75)
     num_layers = kwargs.get('num_layers', 3)
-    num_units = kwargs.get('num_units', 256)
+    num_units = kwargs.get('num_units', 8)
 
     ctx.log('\nParameters:')
     ctx.log(line(length=32))
     ctx.log('name:\t\t{}'.format(name))
-    ctx.log('grid_size:\t{}'.format(grid_size))
+    ctx.log('num_classes:\t{}'.format(num_classes))
     ctx.log('batch_size:\t{}'.format(batch_size))
     ctx.log('data_split:\t{}'.format(data_split))
     ctx.log('seq_len:\t{}'.format(seq_len))
@@ -127,12 +113,12 @@ def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
     data = generate_training_data(ctx,
                                   primary_voice,
                                   secondary_voice)
+
     ctx.log('')
 
     # Encode data before training
     ctx.log(click.style('2. Encode data before training', bold=True))
-    encoded_data = encode_data(data, grid_size)
-    num_classes = grid_size ** 2
+    encoded_data, kmeans = k_means_encode_data(data, num_classes)
     ctx.log('Number of classes: {}\n'.format(num_classes))
 
     # Split in 3 sets for training, validation and testing
@@ -192,7 +178,11 @@ def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
                                    input_length=seq_len))
         for n in range(num_layers - 1):
             model.add(layers.LSTM(num_units, return_sequences=True))
+            if dropout > 0.0:
+                model.add(layers.Dropout(dropout))
         model.add(layers.LSTM(num_units))
+        if dropout > 0.0:
+            model.add(layers.Dropout(dropout))
         model.add(layers.Dense(num_classes, activation='softmax'))
 
         model.compile(loss='sparse_categorical_crossentropy',
@@ -223,12 +213,11 @@ def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
         results = model.predict(samples)
 
         for j, result in enumerate(results):
-            # Reweight the softmax distribution
-            result_value = np.argmax(result)
-
             # Decode data
-            position = decode_data([[result_value]], grid_size).flatten()
-            position_target = decode_data([[targets[j]]], grid_size).flatten()
+            result_value = np.argmax(result)
+            position = k_means_decode_data([[result_value]], kmeans).flatten()
+            position_target = k_means_decode_data([[targets[j]]], kmeans)
+            position_target = position_target.flatten()
 
             # Calculate distance between prediction and actual test target
             dist = max_dist - min(

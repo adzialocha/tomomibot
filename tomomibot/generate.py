@@ -12,16 +12,32 @@ from tomomibot.const import (
     GENERATED_FOLDER, SEQUENCE_FILE, ONSET_FILE, SILENCE_POINT)
 
 
-def analyze_sequence(y, sr, blocks_per_second):
+def trim_silence(audio, threshold):
+    energy = librosa.feature.rmse(audio)
+    frames = np.nonzero(energy > threshold)
+    indices = librosa.core.frames_to_samples(frames)[1]
+    return audio[indices[0]:indices[-1]] if indices.size else audio[0:0]
+
+
+def analyze_sequence(y, sr, blocks_per_second, threshold=0):
     sequence = []
     block_size = sr // blocks_per_second
     start = 0
     end = block_size
 
     while end <= len(y):
+        # Slice audio
         y_slice = y[start:end]
-        melfc = mfcc_features(y_slice, sr)
-        sequence.append(melfc.tolist())
+
+        # Remove silent passages
+        trimmed = trim_silence(y_slice, threshold)
+        trimmed = trimmed.reshape(-1, 1)
+
+        if trimmed.size > 0:
+            # Analyse audio
+            melfc = mfcc_features(y_slice, sr)
+            sequence.append(melfc.tolist())
+
         start += block_size
         end += block_size
 
@@ -143,4 +159,4 @@ def generate_training_data(ctx, voice_primary, voice_secondary):
     ctx.log('Sequence with {} events generated.'.format(
         sequence_len))
 
-    return training_data
+    return np.array(training_data)
