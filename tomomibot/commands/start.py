@@ -7,8 +7,11 @@ from tomomibot.utils import check_valid_voice, check_valid_model
 
 @click.command('start', short_help='Start a live session')
 @click.option('--interval',
-              default=3,
+              default=1,
               help='Interval (in seconds) of analyzing incoming live signal')
+@click.option('--noise_factor',
+              default=0.1,
+              help='Randomize predicted points to make them more diverse')
 @click.option('--input_device',
               default=0,
               help='Index of audio device for incoming signal')

@@ -32,7 +32,7 @@ class Session():
 
         self.blocks_per_second = kwargs.get('blocks_per_second', 10)
         self.interval = kwargs.get('interval', 1)
-        self.noise_factor = kwargs.get('noise_factor', 0.01)
+        self.noise_factor = kwargs.get('noise_factor', 0.1)
         self.num_classes = kwargs.get('num_classes', 10)
         self.threshold = kwargs.get('threshold', 0.01)
         self.samplerate = kwargs.get('samplerate', 44100)
