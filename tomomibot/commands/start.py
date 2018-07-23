@@ -10,7 +10,7 @@ from tomomibot.utils import check_valid_voice, check_valid_model
               default=1,
               help='Interval (in seconds) of analyzing incoming live signal')
 @click.option('--noise_factor',
-              default=0.1,
+              default=0.0,
               help='Randomize predicted points to make them more diverse')
 @click.option('--input_device',
               default=0,
@@ -27,9 +27,9 @@ from tomomibot.utils import check_valid_voice, check_valid_model
 @click.option('--samplerate',
               default=44100,
               help='Sample rate of audio signals')
-@click.option('--onset_threshold',
-              default=10,
-              help='Ignore audio events under this dB value')
+@click.option('--threshold',
+              default=0.001,
+              help='Ignore audio events under this energy value')
 @click.argument('voice')
 @click.argument('model')
 @pass_context

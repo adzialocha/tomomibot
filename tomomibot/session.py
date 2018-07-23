@@ -12,7 +12,7 @@ import tensorflow as tf
 from tomomibot.audio import AudioIO
 from tomomibot.const import MODELS_FOLDER
 from tomomibot.generate import analyze_sequence
-from tomomibot.train import k_means_decode_data, reweight_distribution
+from tomomibot.train import reweight_distribution
 
 
 def add_noise(point, factor=0.01):
@@ -32,9 +32,9 @@ class Session():
 
         self.blocks_per_second = kwargs.get('blocks_per_second', 10)
         self.interval = kwargs.get('interval', 1)
-        self.noise_factor = kwargs.get('noise_factor', 0.1)
+        self.noise_factor = kwargs.get('noise_factor', 0)
         self.num_classes = kwargs.get('num_classes', 10)
-        self.threshold = kwargs.get('threshold', 0.01)
+        self.threshold = kwargs.get('threshold', 0.001)
         self.samplerate = kwargs.get('samplerate', 44100)
         self.seq_len = kwargs.get('seq_len', 10)
         self.temperature = kwargs.get('temperature', 1.0)
@@ -48,6 +48,8 @@ class Session():
                                   channel_out=kwargs.get('output_channel', 0))
         except IndexError as err:
             self.ctx.elog(err)
+
+        self.ctx.log('Loading ..\n')
 
         self._thread = threading.Thread(target=self.run, args=())
         self._thread.daemon = True
@@ -67,6 +69,13 @@ class Session():
         self._kmeans = KMeans(n_clusters=self.num_classes)
         self._kmeans.fit(sequence)
 
+        # Get the classes of the vocie sound material
+        point_classes = self._kmeans.predict(voice.points)
+        self._point_classes = []
+        for idx in range(self.num_classes):
+            indices = np.where(point_classes==idx)
+            self._point_classes.append(indices[0])
+
         self.ctx.log('Voice "{}" with {} samples'
                      .format(voice.name, len(voice.points)))
         self.ctx.log('')
@@ -79,6 +88,8 @@ class Session():
         self.is_running = True
 
         self._thread.start()
+
+        self.ctx.log('Ready!\n')
 
     def stop(self):
         self._audio.stop()
@@ -130,15 +141,18 @@ class Session():
                 result_class = np.argmax(result_reweighted)
 
                 # Decode to a position in PCA space
-                position = k_means_decode_data([[result_class]], self._kmeans)
-                position = position.flatten()
-                position = add_noise(position, self.noise_factor)
-                self.ctx.vlog('Model predicted point {} in cluster {}'.format(
-                    position,
-                    result_class))
+                point_index = np.random.choice(
+                    self._point_classes[result_class])
+                if point_index:
+                    position = self._voice.points[point_index]
+                    position = add_noise(position, self.noise_factor)
+                    self.ctx.vlog(
+                        'Model predicted point {} in cluster {}'.format(
+                            position,
+                            result_class))
 
-                # Find closest sound to this point
-                wavs.append(self._voice.find_wav(position))
+                    # Find closest sound to this point
+                    wavs.append(self._voice.find_wav(position))
 
         # Find closest sound to this point
         for wav in wavs:
