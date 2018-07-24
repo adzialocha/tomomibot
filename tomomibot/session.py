@@ -1,4 +1,5 @@
 import os
+import random
 import threading
 import time
 
@@ -9,7 +10,7 @@ import numpy as np
 import tensorflow as tf
 
 from tomomibot.audio import (AudioIO, slice_audio, detect_onsets,
-                             is_silent, mfcc_features)
+                             is_silent, mfcc_features, get_db)
 from tomomibot.const import MODELS_FOLDER
 from tomomibot.train import reweight_distribution
 
@@ -49,6 +50,7 @@ class Session():
         self._buffer = np.array([])
         self._sequence = []
         self._wavs = []
+        self._density = 0
 
         self.is_running = False
 
@@ -104,11 +106,21 @@ class Session():
             if not self.is_running:
                 return
 
-            if not self._audio.is_playing and len(self._wavs) > 0:
+            if len(self._wavs) > 1:
                 # Play audio!
                 wav = self._wavs[0]
+
+                print('wav', len(self._wavs))
+                print('density', self._density)
+
                 self.ctx.vlog('▶ play .wav sample "{}"'.format(wav))
+
+                rdm = random.expovariate(5) * self._density
+                print('random', rdm)
+                time.sleep(rdm)
+
                 self._audio.play(wav)
+
                 self._wavs = self._wavs[1:]
 
     def tick(self):
@@ -119,11 +131,15 @@ class Session():
         self._buffer = np.concatenate([self._buffer, frames])
 
         self.ctx.vlog('Read %i frames' % frames.shape)
+        print('db', np.max(get_db(frames)))
 
         # Detect onsets in available data
         onsets, _ = detect_onsets(self._buffer,
                                   self.samplerate,
                                   self.threshold_db)
+
+        self._density = min(10, len(onsets)) / 10
+        self._audio.density = max(0.1, self._density)
 
         # Slice audio into parts when possible
         slices = []
@@ -159,12 +175,17 @@ class Session():
         # Reset buffer
         self._buffer = np.array([])
 
+        # Check for too long sequences
+        if len(self._sequence) > 10:
+            self.ctx.vlog('Tomomibot! Too much babbeling! Lets cut it!')
+            self._sequence = self._sequence[self.seq_len:]
+
         # Check if we already have enough data to do something
         if len(self._sequence) < self.seq_len:
             self.ctx.vlog('Sequence too short to play something ..\n')
             return
 
-        print(len(self._sequence) // self.seq_len)
+        print('Sequence: ', self._sequence)
 
         with self._graph.as_default():
             max_index = len(self._sequence)
@@ -202,6 +223,10 @@ class Session():
                 min_index = max_index - self.seq_len
 
         # Remove oldest event from sequence queue
-        self._sequence = self._sequence[self.seq_len:]
+        self._sequence = self._sequence[1:]
+
+        if random.random() < 0.1:
+            print("boom!")
+            self._sequence = []
 
         self.ctx.vlog('')

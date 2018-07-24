@@ -21,7 +21,7 @@ def get_db(y):
 
     # Convert power to decibels
     return librosa.power_to_db(mse.squeeze(),
-                               ref=np.median)
+                               ref=-100)
 
 
 def is_silent(y, threshold_db):
@@ -167,7 +167,6 @@ class AudioIO():
 
         # Prepare writing thread
         self._buffer = np.array([])
-        self.is_playing = False
 
     def read_frames(self):
         with self._lock:
@@ -186,15 +185,14 @@ class AudioIO():
                 self._frames = np.concatenate((self._frames, data))
 
     def _play(self):
-        with self._output.player(self.samplerate,
-                                 channels=[self._output_ch]) as speaker:
-            speaker.play(self._buffer)
-            self.is_playing = False
+        try:
+            with self._output.player(self.samplerate,
+                                     channels=[self._output_ch]) as speaker:
+                speaker.play(self._buffer * self.density)
+        except TypeError:
+            self.ctx.elog('Ouch!')
 
     def play(self, wav_path):
-        with self._lock:
-            self.is_playing = True
-
         data, _ = sf.read(wav_path)
         self._buffer = data
 
