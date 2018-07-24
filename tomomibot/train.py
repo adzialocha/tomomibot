@@ -8,7 +8,7 @@ import click
 import numpy as np
 
 from tomomibot.const import MODELS_FOLDER
-from tomomibot.generate import generate_training_data
+from tomomibot.generate import generate_sequence
 from tomomibot.utils import line
 from tomomibot.voice import Voice
 
@@ -77,16 +77,14 @@ def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
         resume = True
 
     # Parameters and Hyperparameters
-    num_classes = kwargs.get('num_classes', 10)
-
-    batch_size = kwargs.get('batch_size', 64)
-    data_split = kwargs.get('data_split', 0.2)
-    seq_len = kwargs.get('seq_len', 10)
-
-    dropout = kwargs.get('dropout', 0.1)
-    epochs = kwargs.get('epochs', 75)
-    num_layers = kwargs.get('num_layers', 1)
-    num_units = kwargs.get('num_units', 256)
+    num_classes = kwargs.get('num_classes')
+    batch_size = kwargs.get('batch_size')
+    data_split = kwargs.get('data_split')
+    seq_len = kwargs.get('seq_len')
+    dropout = kwargs.get('dropout')
+    epochs = kwargs.get('epochs')
+    num_layers = kwargs.get('num_layers')
+    num_units = kwargs.get('num_units')
 
     ctx.log('\nParameters:')
     ctx.log(line(length=32))
@@ -110,9 +108,8 @@ def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
     ctx.log('Primary voice: "{}"'.format(primary_voice.name))
     ctx.log('Secondary voice: "{}"'.format(secondary_voice.name))
 
-    data = generate_training_data(ctx,
-                                  primary_voice,
-                                  secondary_voice)
+    data = generate_sequence(ctx, primary_voice, secondary_voice,
+                             save_sequence=kwargs.get('save_sequence'))
 
     ctx.log('')
 

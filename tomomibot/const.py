@@ -1,5 +1,31 @@
+# Filesystem
 GENERATED_FOLDER = 'voices'
 MODELS_FOLDER = 'models'
 ONSET_FILE = 'onset.json'
 SEQUENCE_FILE = 'sequence.json'
+
+# Sequence data & generate
+BLOCK_SEC = 120
 SILENCE_POINT = [0.0, 0.0]
+
+# Hyperparameters
+BATCH_SIZE = 32
+DATA_SPLIT = 0.1
+DROPOUT = 0.0
+EPOCHS = 70
+NUM_CLASSES = 100
+NUM_LAYERS = 2
+NUM_UNITS = 256
+SEQ_LEN = 5
+
+# Session
+INTERVAL_SEC = 2.5
+SAMPLE_RATE = 44100
+TEMPERATURE = 1.0
+THRESHOLD_DB = 10
+
+# Soundcard
+INPUT_DEVICE = 0
+INPUT_CHANNEL = 0
+OUTPUT_DEVICE = 0
+OUTPUT_CHANNEL = 0

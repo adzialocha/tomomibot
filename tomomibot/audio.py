@@ -13,11 +13,26 @@ MSE_FRAME_LENGTH = 2048
 MIN_SAMPLE_MS = 100
 
 
+def get_db(y):
+    # Calculate MSE energy per frame
+    mse = librosa.feature.rmse(y=y,
+                               frame_length=MSE_FRAME_LENGTH,
+                               hop_length=HOP_LENGTH) ** 2
+
+    # Convert power to decibels
+    return librosa.power_to_db(mse.squeeze(),
+                               ref=np.median)
+
+
+def is_silent(y, threshold_db):
+    return np.max(get_db(y)) < threshold_db
+
+
 def pca(features, components=2):
     """Dimension reduction via Principal Component Analysis (PCA)"""
     pca = PCA(n_components=components)
     transformed = pca.fit(features).transform(features)
-    scaler = MinMaxScaler()
+    scaler = MinMaxScaler(feature_range=(0, 1))
     scaler.fit(transformed)
     return scaler.transform(transformed), pca, scaler
 
@@ -83,16 +98,8 @@ def detect_onsets(y, sr=44100, db_threshold=10):
                                    sr=sr,
                                    hop_length=HOP_LENGTH)
 
-    # Calculate MSE energy per frame
-    mse = librosa.feature.rmse(y=y,
-                               frame_length=MSE_FRAME_LENGTH,
-                               hop_length=HOP_LENGTH) ** 2
-
-    # Convert power to decibels
-    db = librosa.power_to_db(mse.squeeze(),
-                             ref=np.median)
-
     # Filter out onsets which signals are too low
+    db = get_db(y)
     onsets = [o for o in onsets if db[o] > db_threshold]
 
     return onsets, times[onsets]
@@ -158,6 +165,10 @@ class AudioIO():
         self._frames = np.array([])
         self.is_running = False
 
+        # Prepare writing thread
+        self._buffer = np.array([])
+        self.is_playing = False
+
     def read_frames(self):
         with self._lock:
             frames = self._frames
@@ -174,14 +185,24 @@ class AudioIO():
                 data = mic.record(self.buffersize)
                 self._frames = np.concatenate((self._frames, data))
 
-    def play(self, wav_path):
-        data, _ = sf.read(wav_path)
+    def _play(self):
         with self._output.player(self.samplerate,
                                  channels=[self._output_ch]) as speaker:
-            speaker.play(data)
+            speaker.play(self._buffer)
+            self.is_playing = False
+
+    def play(self, wav_path):
+        with self._lock:
+            self.is_playing = True
+
+        data, _ = sf.read(wav_path)
+        self._buffer = data
+
+        threading.Thread(target=self._play).start()
 
     def start(self):
-        self.is_running = True
+        with self._lock:
+            self.is_running = True
         threading.Thread(target=self.record).start()
 
     def stop(self):

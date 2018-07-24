@@ -36,8 +36,8 @@ class Voice:
 
     def project(self, vectors):
         """Project a new mfcc vector into given PCA space"""
-        point = self._pca_instance.transform(vectors)
-        return self._pca_scaler.transform(point)
+        points = self._pca_instance.transform(vectors)
+        return self._pca_scaler.transform(points)
 
     def find_wav(self, point):
         """Find closest point and return its wav file path"""

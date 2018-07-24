@@ -4,8 +4,8 @@ import click
 
 from tomomibot.audio import all_inputs, all_outputs
 from tomomibot.cli import pass_context
-from tomomibot.const import GENERATED_FOLDER
-from tomomibot.utils import line, check_valid_voice
+from tomomibot.const import GENERATED_FOLDER, MODELS_FOLDER
+from tomomibot.utils import line, check_valid_voice, check_valid_model
 
 
 def list_audio_channels(ctx, channels):
@@ -38,6 +38,25 @@ def list_voices(ctx):
                 status))
 
 
+def list_models(ctx):
+    ctx.log(line())
+    ctx.log('{0:2} {1:30} {2:10}'.format(' #', 'Name', 'Status'))
+    ctx.log(line())
+    model_dir = os.path.join(os.getcwd(), MODELS_FOLDER)
+    for i, entry in enumerate(os.scandir(model_dir)):
+        if entry.is_file():
+            try:
+                check_valid_model(entry.name.split('.')[0])
+            except FileNotFoundError:
+                status = click.style('✘', fg='red')
+            else:
+                status = click.style('✓', fg='green')
+            ctx.log('{0:2} {1:30} {2:10}'.format(
+                i,
+                entry.name[:30],
+                status))
+
+
 @click.command('status', short_help='Display system info and audio devices')
 @pass_context
 def cli(ctx):
@@ -55,3 +74,7 @@ def cli(ctx):
 
     ctx.log(click.style('Generated voices', bold=True))
     list_voices(ctx)
+    ctx.log('')
+
+    ctx.log(click.style('Trained models', bold=True))
+    list_models(ctx)
