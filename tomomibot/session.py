@@ -184,7 +184,7 @@ class Session():
         # Check for too long sequences, cut it if necessary
         penalty = self.seq_len * self.penalty
         if len(self._sequence) > penalty:
-            self._sequence = self._sequence[self.seq_len:]
+            self._sequence = self._sequence[penalty:]
 
         # Check if we already have enough data to do something
         if len(self._sequence) < self.seq_len:
