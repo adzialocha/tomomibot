@@ -78,7 +78,7 @@ def slice_audio(y, onsets, sr=44100, offset=0):
     return frames
 
 
-def detect_onsets(y, sr=44100, db_threshold=10):
+def detect_onsets(y, sr=44100, db_threshold=-50):
     # Get the frame->beat strength profile
     onset_envelope = librosa.onset.onset_strength(y=y,
                                                   sr=sr,

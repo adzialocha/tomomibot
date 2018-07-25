@@ -8,8 +8,7 @@ import soundfile as sf
 
 
 from tomomibot.audio import detect_onsets, slice_audio, mfcc_features
-from tomomibot.const import (GENERATED_FOLDER, SEQUENCE_FILE,
-                             ONSET_FILE, SILENCE_POINT)
+from tomomibot.const import (GENERATED_FOLDER, ONSET_FILE, SILENCE_POINT)
 
 
 def generate_voice(ctx, file, name, db_threshold, block):
@@ -37,7 +36,6 @@ def generate_voice(ctx, file, name, db_threshold, block):
     counter = 1
     block_no = 0
     data = []
-    sequence = []
 
     ctx.log('Analyze .wav file "%s" with %i frames and sample rate %i' % (
         click.format_filename(file, shorten=True),
@@ -86,12 +84,6 @@ def generate_voice(ctx, file, name, db_threshold, block):
     with open(data_path, 'w') as file:
         json.dump(data, file, indent=2, separators=(',', ': '))
     ctx.log('saved .json file with analyzed data.')
-
-    # ... and save sequence file
-    data_path = os.path.join(voice_dir, SEQUENCE_FILE)
-    with open(data_path, 'w') as file:
-        json.dump(sequence, file, indent=2, separators=(',', ': '))
-    ctx.log('saved .json file with sequence.')
 
 
 def generate_sequence(ctx, voice_primary, voice_secondary,
