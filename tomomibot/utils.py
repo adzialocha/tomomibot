@@ -1,6 +1,8 @@
 import json
 import os
 
+import numpy as np
+
 from tomomibot.const import (
     GENERATED_FOLDER, ONSET_FILE, SEQUENCE_FILE, MODELS_FOLDER)
 
@@ -57,3 +59,22 @@ def check_valid_voice(name):
                 raise FileNotFoundError(
                     'Could not find wav file "{}" in voice folder'.format(
                         wav_path))
+
+
+def plot_position(position, x_size=20, y_size=10):
+    point_x = np.floor(((position[0] + 1.0) / 2.0) * x_size)
+    point_y = np.floor(((position[1] + 1.0) / 2.0) * y_size)
+
+    strb = ''
+
+    for y in reversed(range(y_size + 1)):
+        line = ''
+        for x in range(x_size + 1):
+            if point_x == x and point_y == y:
+                char = '▪'
+            else:
+                char = '█'
+            line += char
+        strb += line + '\n'
+
+    return strb

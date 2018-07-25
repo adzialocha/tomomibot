@@ -20,8 +20,7 @@ def get_db(y):
                                hop_length=HOP_LENGTH) ** 2
 
     # Convert power to decibels
-    return librosa.power_to_db(mse.squeeze(),
-                               ref=-100)
+    return librosa.power_to_db(mse.squeeze(), ref=-100)
 
 
 def is_silent(y, threshold_db):
@@ -184,19 +183,19 @@ class AudioIO():
                 data = mic.record(self.buffersize)
                 self._frames = np.concatenate((self._frames, data))
 
-    def _play(self):
+    def play_buffer(self):
         try:
             with self._output.player(self.samplerate,
                                      channels=[self._output_ch]) as speaker:
-                speaker.play(self._buffer * self.density)
+                speaker.play(self._buffer)
         except TypeError:
-            self.ctx.elog('Ouch!')
+            self.ctx.elog('Something went wrong during audio playback!')
 
     def play(self, wav_path):
-        data, _ = sf.read(wav_path)
-        self._buffer = data
-
-        threading.Thread(target=self._play).start()
+        with self._lock:
+            data, _ = sf.read(wav_path)
+            self._buffer = data
+        threading.Thread(target=self.play_buffer).start()
 
     def start(self):
         with self._lock:

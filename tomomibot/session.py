@@ -13,9 +13,13 @@ from tomomibot.audio import (AudioIO, slice_audio, detect_onsets,
                              is_silent, mfcc_features, get_db)
 from tomomibot.const import MODELS_FOLDER
 from tomomibot.train import reweight_distribution
+from tomomibot.utils import plot_position
 
 
-CHECK_WAV_INTERVAL = 0.1
+CHECK_WAV_INTERVAL = 0.1        # Check .wav queue interval (in seconds)
+MAX_DENSITY_ONSETS = 10         # How many offsets for max density
+PLAY_DELAY_EXP = 5              # Exponent for maximum density delay
+RESET_PROPABILITY = 0.1         # Percentage of chance for resetting sequence
 
 
 class Session():
@@ -40,17 +44,18 @@ class Session():
         except IndexError as err:
             self.ctx.elog(err)
 
-        self.ctx.log('Loading ..\n')
+        self.ctx.log('Loading ..')
 
+        # Prepare parallel tasks
         self._thread = threading.Thread(target=self.run, args=())
         self._thread.daemon = True
-        self._wav_thread = threading.Thread(target=self.check_wavs, args=())
-        self._wav_thread.daemon = True
+        self._play_thread = threading.Thread(target=self.play, args=())
+        self._play_thread.daemon = True
 
-        self._buffer = np.array([])
+        # Prepare playing logic
         self._sequence = []
         self._wavs = []
-        self._density = 0
+        self._density = 0.0
 
         self.is_running = False
 
@@ -76,16 +81,16 @@ class Session():
 
         self.ctx.log('Voice "{}" with {} samples'
                      .format(voice.name, len(voice.points)))
-        self.ctx.log('')
 
     def start(self):
+        self.is_running = True
+
         # Start reading audio signal _input
         self._audio.start()
 
         # Start threads
-        self.is_running = True
         self._thread.start()
-        self._wav_thread.start()
+        self._play_thread.start()
 
         self.ctx.log('Ready!\n')
 
@@ -99,28 +104,30 @@ class Session():
             if self.is_running:
                 self.tick()
 
-    def check_wavs(self):
+    def play(self):
         while self.is_running:
             time.sleep(CHECK_WAV_INTERVAL)
-
             if not self.is_running:
                 return
 
             if len(self._wavs) > 1:
-                # Play audio!
+                # Get next wav file to play from queue
                 wav = self._wavs[0]
 
-                print('wav', len(self._wavs))
-                print('density', self._density)
+                self.ctx.vlog(
+                    '▶ play .wav sample "{}" (queue={}, density={})'.format(
+                        wav,
+                        len(self._wavs),
+                        self._density))
 
-                self.ctx.vlog('▶ play .wav sample "{}"'.format(wav))
-
-                rdm = random.expovariate(5) * self._density
-                print('random', rdm)
+                # Delay playing the sample a little bit
+                rdm = random.expovariate(PLAY_DELAY_EXP) * self._density
                 time.sleep(rdm)
 
+                # Play it!
                 self._audio.play(wav)
 
+                # Remove the played sample from our queue
                 self._wavs = self._wavs[1:]
 
     def tick(self):
@@ -128,32 +135,28 @@ class Session():
 
         # Read current frame buffer from input signal
         frames = np.array(self._audio.read_frames()).flatten()
-        self._buffer = np.concatenate([self._buffer, frames])
 
-        self.ctx.vlog('Read %i frames' % frames.shape)
-        print('db', np.max(get_db(frames)))
+        self.ctx.vlog('Read {} frames (volume={}dB)'.format(
+            len(frames), np.max(get_db(frames))))
 
         # Detect onsets in available data
-        onsets, _ = detect_onsets(self._buffer,
+        onsets, _ = detect_onsets(frames,
                                   self.samplerate,
                                   self.threshold_db)
 
-        self._density = min(10, len(onsets)) / 10
-        self._audio.density = max(0.1, self._density)
+        # Set a density based on amount of onsets
+        self._density = min(
+            MAX_DENSITY_ONSETS, len(onsets)) / MAX_DENSITY_ONSETS
 
         # Slice audio into parts when possible
         slices = []
-        if len(onsets) == 0:
-            if is_silent(self._buffer, self.threshold_db):
-                self.ctx.vlog('No onsets detected ..')
-            else:
-                self.ctx.vlog('No onsets detected but some audio activity!')
-                slices = [[self._buffer, 0, 0]]
+        if len(onsets) == 0 and not is_silent(frames, self.threshold_db):
+            slices = [[frames, 0, 0]]
         else:
-            self.ctx.vlog('%i onsets detected' % len(onsets))
-            slices = slice_audio(self._buffer, onsets)
+            slices = slice_audio(frames, onsets)
 
-        self.ctx.vlog('%i slices generated' % len(slices))
+        self.ctx.vlog('{} onsets detected & {} slices generated'.format(
+            len(onsets), len(slices)))
 
         # Analyze and categorize slices
         for y in slices:
@@ -172,33 +175,27 @@ class Session():
             # Add it to our sequence queue
             self._sequence.append(point_class)
 
-        # Reset buffer
-        self._buffer = np.array([])
-
-        # Check for too long sequences
-        if len(self._sequence) > 10:
-            self.ctx.vlog('Tomomibot! Too much babbeling! Lets cut it!')
-            self._sequence = self._sequence[self.seq_len:]
+        # Check for too long sequences, cut it if necessary
+        penalty = self.seq_len * 2
+        if len(self._sequence) > penalty:
+            self._sequence = self._sequence[penalty:]
 
         # Check if we already have enough data to do something
         if len(self._sequence) < self.seq_len:
-            self.ctx.vlog('Sequence too short to play something ..\n')
+            self.ctx.vlog('')
             return
-
-        print('Sequence: ', self._sequence)
 
         with self._graph.as_default():
             max_index = len(self._sequence)
-            min_index = max_index - self.seq_len
             while True:
+                # Play all possible subsequences
+                min_index = max_index - self.seq_len
                 if min_index < 0:
                     break
-
                 sequence_slice = self._sequence[min_index:max_index]
 
                 # Predict next action via model
-                result = self._model.predict(
-                    np.array([sequence_slice]))
+                result = self._model.predict(np.array([sequence_slice]))
 
                 # Reweight the softmax distribution
                 result_reweighted = reweight_distribution(result,
@@ -210,23 +207,18 @@ class Session():
                     self._point_classes[result_class])
 
                 if point_index:
-                    position = self._voice.points[point_index]
-                    self.ctx.vlog(
-                        'Model predicted point {} in cluster {}'.format(
-                            position,
-                            result_class))
-
                     # Find closest sound to this point
+                    position = self._voice.points[point_index]
                     self._wavs.append(self._voice.find_wav(position))
+                    if not self.ctx.verbose:
+                        self.ctx.log(plot_position(position))
 
                 max_index -= 1
-                min_index = max_index - self.seq_len
 
         # Remove oldest event from sequence queue
         self._sequence = self._sequence[1:]
 
-        if random.random() < 0.1:
-            print("boom!")
+        if random.random() < RESET_PROPABILITY:
             self._sequence = []
 
         self.ctx.vlog('')
