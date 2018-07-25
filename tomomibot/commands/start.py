@@ -32,13 +32,16 @@ from tomomibot.const import (INTERVAL_SEC, INPUT_DEVICE, OUTPUT_CHANNEL,
               help='Ignore audio events under this db value')
 @click.option('--num_classes',
               default=NUM_CLASSES,
-              help='')
+              help='Number of k-means classes')
 @click.option('--seq_len',
               default=SEQ_LEN,
-              help='')
+              help='How long is the sequence the model needs to predict')
 @click.option('--temperature',
               default=TEMPERATURE,
-              help='')
+              help='Softmax reweighting temperature')
+@click.option('--reference',
+              default=None,
+              help='Use this voice as a reference for PCA and k-means')
 @click.argument('voice')
 @click.argument('model')
 @pass_context

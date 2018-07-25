@@ -3,8 +3,7 @@ import os
 
 import numpy as np
 
-from tomomibot.const import (
-    GENERATED_FOLDER, ONSET_FILE, SEQUENCE_FILE, MODELS_FOLDER)
+from tomomibot.const import GENERATED_FOLDER, ONSET_FILE, MODELS_FOLDER
 
 
 def line(char='-', length=48):
@@ -46,11 +45,6 @@ def check_valid_voice(name):
     if not os.path.isfile(voice_data_file):
         raise FileNotFoundError('Could not find {} in voice folder'.format(
             ONSET_FILE))
-
-    sequence_file = os.path.join(voice_dir, SEQUENCE_FILE)
-    if not os.path.isfile(sequence_file):
-        raise FileNotFoundError('Could not find {} in voice folder'.format(
-            SEQUENCE_FILE))
 
     with open(voice_data_file) as file:
         for entry in json.load(file):

@@ -4,7 +4,7 @@ import os
 import numpy as np
 
 from tomomibot.audio import pca
-from tomomibot.const import GENERATED_FOLDER, ONSET_FILE, SEQUENCE_FILE
+from tomomibot.const import GENERATED_FOLDER, ONSET_FILE
 from tomomibot.utils import make_wav_path
 
 
@@ -12,11 +12,6 @@ class Voice:
 
     def __init__(self, name, **kwargs):
         self.name = name
-
-        # Load sequence from voice
-        sequence_path = os.path.join(GENERATED_FOLDER, name, SEQUENCE_FILE)
-        with open(sequence_path) as f:
-            self.sequence = np.array(json.load(f))
 
         # Load data file from voice
         onset_path = os.path.join(GENERATED_FOLDER, name, ONSET_FILE)
@@ -28,11 +23,17 @@ class Voice:
             self.wavs = [make_wav_path(name, wav['id']) for wav in data]
             self.positions = [[wav['start'], wav['end']] for wav in data]
 
-            # Calculate PCA
-            pca_points, pca_instance, pca_scaler = pca(self.mfccs)
-            self.points = pca_points
-            self._pca_instance = pca_instance
-            self._pca_scaler = pca_scaler
+            self.fit()
+
+    def fit(self, reference_voice=None):
+        if reference_voice is None:
+            reference_voice = self
+
+        # Calculate PCA
+        _, pca_instance, pca_scaler = pca(reference_voice.mfccs)
+        self.points = pca_instance.transform(self.mfccs)
+        self._pca_instance = pca_instance
+        self._pca_scaler = pca_scaler
 
     def project(self, vectors):
         """Project a new mfcc vector into given PCA space"""

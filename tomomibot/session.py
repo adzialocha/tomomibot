@@ -24,7 +24,7 @@ RESET_PROPABILITY = 0.1         # Percentage of chance for resetting sequence
 
 class Session():
 
-    def __init__(self, ctx, voice, model, **kwargs):
+    def __init__(self, ctx, voice, model, reference_voice=None, **kwargs):
         self.ctx = ctx
 
         self.interval = kwargs.get('interval')
@@ -68,9 +68,14 @@ class Session():
         self._graph = tf.get_default_graph()
 
         # Prepare voice and k-means clustering
+        if reference_voice is None:
+            reference_voice = voice
+        else:
+            voice.fit(reference_voice)
+
         self._voice = voice
         self._kmeans = KMeans(n_clusters=self.num_classes)
-        self._kmeans.fit(self._voice.points)
+        self._kmeans.fit(reference_voice.points)
 
         # Get the classes of the voice sound material / points
         point_classes = self._kmeans.predict(self._voice.points)

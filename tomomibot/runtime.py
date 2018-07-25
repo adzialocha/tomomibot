@@ -18,7 +18,14 @@ class Runtime:
         self._display_welcome()
 
         voice = Voice(voice_name)
-        self._session = Session(self.ctx, voice, model, **kwargs)
+        reference_voice_name = kwargs.get('reference', None)
+        if reference_voice_name is not None:
+            reference_voice = Voice(reference_voice_name)
+        else:
+            reference_voice = None
+
+        self._session = Session(self.ctx, voice,
+                                model, reference_voice, **kwargs)
         self._thread = None
 
     def initialize(self):
