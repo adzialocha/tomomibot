@@ -29,6 +29,7 @@ class Session():
 
         self.interval = kwargs.get('interval')
         self.num_classes = kwargs.get('num_classes')
+        self.penalty = kwargs.get('penalty')
         self.samplerate = kwargs.get('samplerate')
         self.seq_len = kwargs.get('seq_len')
         self.temperature = kwargs.get('temperature')
@@ -181,9 +182,9 @@ class Session():
             self._sequence.append(point_class)
 
         # Check for too long sequences, cut it if necessary
-        penalty = self.seq_len * 2
+        penalty = self.seq_len * self.penalty
         if len(self._sequence) > penalty:
-            self._sequence = self._sequence[penalty:]
+            self._sequence = self._sequence[self.seq_len:]
 
         # Check if we already have enough data to do something
         if len(self._sequence) < self.seq_len:
@@ -208,8 +209,10 @@ class Session():
                 result_class = np.argmax(result_reweighted)
 
                 # Decode to a position in PCA space
-                point_index = np.random.choice(
-                    self._point_classes[result_class])
+                point_index = None
+                if len(self._point_classes[result_class]):
+                    point_index = np.random.choice(
+                        self._point_classes[result_class])
 
                 if point_index:
                     # Find closest sound to this point

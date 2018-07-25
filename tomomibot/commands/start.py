@@ -5,7 +5,8 @@ from tomomibot.runtime import Runtime
 from tomomibot.utils import check_valid_voice, check_valid_model
 from tomomibot.const import (INTERVAL_SEC, INPUT_DEVICE, OUTPUT_CHANNEL,
                              INPUT_CHANNEL, OUTPUT_DEVICE, SAMPLE_RATE,
-                             THRESHOLD_DB, NUM_CLASSES, SEQ_LEN, TEMPERATURE)
+                             THRESHOLD_DB, NUM_CLASSES, SEQ_LEN, TEMPERATURE,
+                             PENALTY)
 
 
 @click.command('start', short_help='Start a live session')
@@ -39,6 +40,9 @@ from tomomibot.const import (INTERVAL_SEC, INPUT_DEVICE, OUTPUT_CHANNEL,
 @click.option('--temperature',
               default=TEMPERATURE,
               help='Softmax reweighting temperature')
+@click.option('--penalty',
+              default=PENALTY,
+              help='Multiple of seq_len to be reached for cutting sequence')
 @click.option('--reference',
               default=None,
               help='Use this voice as a reference for PCA and k-means')
