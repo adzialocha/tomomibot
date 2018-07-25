@@ -83,7 +83,7 @@ def detect_onsets(y, sr=44100, db_threshold=-50):
     onset_envelope = librosa.onset.onset_strength(y=y,
                                                   sr=sr,
                                                   hop_length=HOP_LENGTH,
-                                                  aggregate=np.median)
+                                                  aggregate=np.max)
 
     # Locate note onset events
     onsets = librosa.onset.onset_detect(y=y,
