@@ -41,7 +41,8 @@ class Session():
                                   device_in=kwargs.get('input_device'),
                                   device_out=kwargs.get('output_device'),
                                   channel_in=kwargs.get('input_channel'),
-                                  channel_out=kwargs.get('output_channel'))
+                                  channel_out=kwargs.get('output_channel'),
+                                  volume=kwargs.get('volume'))
         except IndexError as err:
             self.ctx.elog(err)
 

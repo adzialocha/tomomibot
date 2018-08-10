@@ -6,7 +6,7 @@ from tomomibot.utils import check_valid_voice, check_valid_model
 from tomomibot.const import (INTERVAL_SEC, INPUT_DEVICE, OUTPUT_CHANNEL,
                              INPUT_CHANNEL, OUTPUT_DEVICE, SAMPLE_RATE,
                              THRESHOLD_DB, NUM_CLASSES, SEQ_LEN, TEMPERATURE,
-                             PENALTY)
+                             PENALTY, VOLUME)
 
 
 @click.command('start', short_help='Start a live session')
@@ -46,6 +46,10 @@ from tomomibot.const import (INTERVAL_SEC, INPUT_DEVICE, OUTPUT_CHANNEL,
 @click.option('--reference',
               default=None,
               help='Use this voice as a reference for PCA and k-means')
+@click.option('--volume',
+              default=VOLUME,
+              type=float,
+              help='Volume of the audio output')
 @click.argument('voice')
 @click.argument('model')
 @pass_context

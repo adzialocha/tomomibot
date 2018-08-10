@@ -123,10 +123,12 @@ class AudioIO():
 
     def __init__(self, ctx, samplerate=44100, buffersize=1024,
                  device_in=0, channel_in=0,
-                 device_out=0, channel_out=0):
+                 device_out=0, channel_out=0,
+                 volume=1.0):
         self.ctx = ctx
         self.samplerate = samplerate
         self.buffersize = buffersize
+        self.volume = volume
 
         # Select audio devices and its channels
         inputs = all_inputs()
@@ -187,7 +189,7 @@ class AudioIO():
         try:
             with self._output.player(self.samplerate,
                                      channels=[self._output_ch]) as speaker:
-                speaker.play(self._buffer)
+                speaker.play(self._buffer * self.volume)
         except TypeError:
             self.ctx.elog('Something went wrong during audio playback!')
 
