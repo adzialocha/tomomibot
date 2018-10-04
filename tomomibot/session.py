@@ -143,6 +143,11 @@ class Session():
         # Read current frame buffer from input signal
         frames = np.array(self._audio.read_frames()).flatten()
 
+        if len(frames) == 0:
+            self.ctx.elog('Frame buffer is zero! '
+                          'Maybe you choose a too small interval?')
+            return
+
         self.ctx.vlog('Read {} frames (volume={}dB)'.format(
             len(frames), np.max(get_db(frames))))
 

@@ -183,7 +183,14 @@ class AudioIO():
                                   channels=[self._input_ch]) as mic:
             while self.is_running:
                 data = mic.record(self.buffersize)
-                self._frames = np.concatenate((self._frames, data))
+                try:
+                    self._frames = np.concatenate((self._frames, data))
+                except ValueError:
+                    self.ctx.elog(
+                        'Something went wrong during audio recording!',
+                        data.shape,
+                        self._frames.shape)
+                    continue
 
     def play_buffer(self):
         try:
