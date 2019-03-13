@@ -174,16 +174,20 @@ class Session():
             y_slice = librosa.util.normalize(y[0])
 
             # Calculate MFCCs
-            mfcc = mfcc_features(y_slice, self.samplerate)
+            try:
+                mfcc = mfcc_features(y_slice, self.samplerate)
 
-            # Project point into given voice PCA space
-            point = self._voice.project([mfcc])[0].flatten()
+                # Project point into given voice PCA space
+                point = self._voice.project([mfcc])[0].flatten()
 
-            # Predict k-means class from point
-            point_class = self._kmeans.predict([point])[0]
+                # Predict k-means class from point
+                point_class = self._kmeans.predict([point])[0]
 
-            # Add it to our sequence queue
-            self._sequence.append(point_class)
+                # Add it to our sequence queue
+                self._sequence.append(point_class)
+            except ValueError as err:
+                self.ctx.vlog(
+                    'Not enough sample data for MFCC analysis')
 
         # Check for too long sequences, cut it if necessary
         penalty = self.seq_len * self.penalty

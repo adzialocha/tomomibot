@@ -8,9 +8,10 @@ import soundcard as sc
 import soundfile as sf
 
 
+DELTA_WIDTH = 9
 HOP_LENGTH = 512
-MSE_FRAME_LENGTH = 2048
 MIN_SAMPLE_MS = 100
+MSE_FRAME_LENGTH = 2048
 
 
 def get_db(y):
@@ -51,12 +52,15 @@ def mfcc_features(y, sr, n_mels=128, n_mfcc=13):
                                 sr=sr,
                                 n_mfcc=n_mfcc)
 
+    if mfcc.shape[-1] < DELTA_WIDTH:
+        raise ValueError('MFCC vector does not contain enough time steps')
+
     if not mfcc.any():
         return np.zeros(n_mfcc * 3)
 
     # Standardize feature for equal variance
-    delta_mfcc = librosa.feature.delta(mfcc)
-    delta2_mfcc = librosa.feature.delta(mfcc, order=2)
+    delta_mfcc = librosa.feature.delta(mfcc, width=DELTA_WIDTH)
+    delta2_mfcc = librosa.feature.delta(mfcc, order=2, width=DELTA_WIDTH)
     feature_vector = np.concatenate((
         np.mean(mfcc, 1),
         np.mean(delta_mfcc, 1),
