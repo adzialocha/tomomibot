@@ -23,6 +23,7 @@ setup(name='tomomibot',
                         'librosa==0.6.3',
                         'numpy==1.16.2',
                         'scikit-learn==0.20.3',
+                        'scipy==1.2.1',
                         'tensorflow==1.12.0'],
       packages=find_packages(),
       entry_points={
