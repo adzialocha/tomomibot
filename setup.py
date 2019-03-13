@@ -21,10 +21,10 @@ setup(name='tomomibot',
                         'SoundFile==0.10.2',
                         'keras==2.2.4',
                         'librosa==0.6.3',
-                        'numpy==1.16.2',
+                        'numpy==1.14.5',
                         'scikit-learn==0.20.3',
                         'scipy==1.2.1',
-                        'tensorflow==1.12.0'],
+                        'tensorflow==1.9.0'],
       packages=find_packages(),
       entry_points={
             'console_scripts': {
