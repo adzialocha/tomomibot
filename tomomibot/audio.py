@@ -181,6 +181,10 @@ class AudioIO():
                                   channels=[self._input_ch]) as mic:
             while self.is_running:
                 data = mic.record(self.buffersize)
+
+                # Reshape the vector as it looks different on Linux
+                data = np.reshape(data, self.buffersize)
+
                 try:
                     self._frames = np.concatenate((self._frames, data))
                 except ValueError:
