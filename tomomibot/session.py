@@ -144,11 +144,9 @@ class Session():
         frames = np.array(self._audio.read_frames()).flatten()
 
         if len(frames) == 0:
-            self.ctx.elog('Frame buffer is zero! '
-                          'Maybe you choose a too small interval?')
             return
 
-        self.ctx.vlog('Read {} frames (volume={}dB)'.format(
+        self.ctx.vlog('Read {0} frames (volume={1:.2f}dB)'.format(
             len(frames), np.max(get_db(frames))))
 
         # Detect onsets in available data
