@@ -113,13 +113,7 @@ def all_outputs():
 
 
 class AudioIO():
-    """Records data from an audio source.
-
-    # Properties
-        rate
-        buffersize
-        input_index
-    """
+    """Records data from an audio source."""
 
     def __init__(self, ctx, samplerate=44100, buffersize=1024,
                  device_in=0, channel_in=0,
