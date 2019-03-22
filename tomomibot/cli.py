@@ -1,6 +1,5 @@
 import os
 import sys
-import warnings
 
 import click
 
@@ -8,11 +7,6 @@ from tomomibot.utils import health_check
 
 
 CONTEXT_SETTINGS = dict(auto_envvar_prefix='COMPLEX')
-
-# Ignore LAPACK warning (https://github.com/scipy/scipy/issues/5998)
-warnings.filterwarnings(action='ignore',
-                        module='scipy',
-                        message='^internal gelsd')
 
 # Disable debugging logs of tensorflow
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
