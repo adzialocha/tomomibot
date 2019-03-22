@@ -6,6 +6,7 @@ import time
 import click
 
 from tomomibot import __version__
+from tomomibot.server import Server
 from tomomibot.session import Session
 from tomomibot.voice import Voice
 
@@ -24,8 +25,9 @@ class Runtime:
         else:
             reference_voice = None
 
-        self._session = Session(self.ctx, voice,
-                                model, reference_voice, **kwargs)
+        self._session = Session(self.ctx)
+        self._session.initialize(voice, model, reference_voice, **kwargs)
+
         self._thread = None
 
     def initialize(self):
@@ -62,9 +64,38 @@ class Runtime:
 
     def _confirm_exit(self):
         if click.confirm('Do you really want to stop this session?'):
-            self._session.stop()
+            self._handle_exit()
             self.ctx.log('Shutdown confirmed!')
             return
 
     def _signal_stop(self, sig, frame):
+        self._handle_exit()
+
+    def _handle_exit(self):
         self._session.stop()
+
+
+class ServerRuntime(Runtime):
+
+    def __init__(self, ctx, **kwargs):
+        self.ctx = ctx
+
+        self._display_welcome()
+
+        self._server = Server(ctx)
+
+        self._session = Session(self.ctx)
+
+        self._thread = None
+
+    def initialize(self):
+        self._init_signal()
+        self._server.start()
+
+        # This is our main thread. Keep it alive!
+        while self._session.is_running:
+            time.sleep(1)
+
+    def _handle_exit(self):
+        self._session.stop()
+        self._server.stop()

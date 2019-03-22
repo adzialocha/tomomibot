@@ -24,29 +24,19 @@ RESET_PROPABILITY = 0.1         # Percentage of chance for resetting sequence
 
 class Session():
 
-    def __init__(self, ctx, voice, model, reference_voice=None, **kwargs):
+    def __init__(self, ctx):
         self.ctx = ctx
 
-        self.interval = kwargs.get('interval')
-        self.num_classes = kwargs.get('num_classes')
-        self.penalty = kwargs.get('penalty')
-        self.samplerate = kwargs.get('samplerate')
-        self.seq_len = kwargs.get('seq_len')
-        self.temperature = kwargs.get('temperature')
-        self.threshold_db = kwargs.get('threshold')
+        self.is_running = False
+        self.is_initialized = False
 
-        try:
-            self._audio = AudioIO(ctx,
-                                  samplerate=self.samplerate,
-                                  device_in=kwargs.get('input_device'),
-                                  device_out=kwargs.get('output_device'),
-                                  channel_in=kwargs.get('input_channel'),
-                                  channel_out=kwargs.get('output_channel'),
-                                  volume=kwargs.get('volume'))
-        except IndexError as err:
-            self.ctx.elog(err)
-
-        self.ctx.log('Loading ..')
+        self.interval = 0
+        self.num_classes = 0
+        self.penalty = 0
+        self.samplerate = 0
+        self.seq_len = 0
+        self.temperature = 0.0
+        self.threshold_db = 0
 
         # Prepare parallel tasks
         self._thread = threading.Thread(target=self.run, args=())
@@ -59,7 +49,38 @@ class Session():
         self._wavs = []
         self._density = 0.0
 
-        self.is_running = False
+        # Prepare session instances
+        self._audio = None
+        self._model = None
+        self._graph = None
+        self._voice = None
+        self._kmeans = None
+
+        self._point_classes = []
+
+    def initialize(self, voice, model, reference_voice=None, **kwargs):
+        self.is_initialized = True
+
+        self.interval = kwargs.get('interval')
+        self.num_classes = kwargs.get('num_classes')
+        self.penalty = kwargs.get('penalty')
+        self.samplerate = kwargs.get('samplerate')
+        self.seq_len = kwargs.get('seq_len')
+        self.temperature = kwargs.get('temperature')
+        self.threshold_db = kwargs.get('threshold')
+
+        try:
+            self._audio = AudioIO(self.ctx,
+                                  samplerate=self.samplerate,
+                                  device_in=kwargs.get('input_device'),
+                                  device_out=kwargs.get('output_device'),
+                                  channel_in=kwargs.get('input_channel'),
+                                  channel_out=kwargs.get('output_channel'),
+                                  volume=kwargs.get('volume'))
+        except IndexError as err:
+            self.ctx.elog(err)
+
+        self.ctx.log('Loading ..')
 
         # Load model & make it ready for being used in another thread
         model_name = '{}.h5'.format(model)
@@ -90,6 +111,9 @@ class Session():
                      .format(voice.name, len(voice.points)))
 
     def start(self):
+        if not self.is_initialized:
+            return
+
         self.is_running = True
 
         # Start reading audio signal _input
@@ -102,6 +126,9 @@ class Session():
         self.ctx.log('Ready!\n')
 
     def stop(self):
+        if not self.is_initialized:
+            return
+
         self._audio.stop()
         self.is_running = False
 
@@ -185,7 +212,7 @@ class Session():
 
                 # Add it to our sequence queue
                 self._sequence.append(point_class)
-            except ValueError as err:
+            except ValueError:
                 self.ctx.vlog(
                     'Not enough sample data for MFCC analysis')
 
