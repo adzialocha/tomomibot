@@ -126,7 +126,9 @@ class AudioIO():
         self.ctx = ctx
         self.samplerate = samplerate
         self.buffersize = buffersize
-        self.volume = volume
+
+        # Parameters to be changed during live performance
+        self._volume = volume
 
         # Select audio devices and its channels
         inputs = all_inputs()
@@ -167,6 +169,15 @@ class AudioIO():
         # Prepare writing thread
         self._buffer = np.array([])
 
+    @property
+    def volume(self):
+        return self._volume
+
+    @volume.setter
+    def volume(self, value):
+        with self._lock:
+            self._volume = value
+
     def read_frames(self):
         with self._lock:
             frames = self._frames
@@ -198,7 +209,7 @@ class AudioIO():
         try:
             with self._output.player(self.samplerate,
                                      channels=[self._output_ch]) as speaker:
-                speaker.play(self._buffer * self.volume)
+                speaker.play(self._buffer * self._volume)
         except TypeError:
             self.ctx.elog('Something went wrong during audio playback!')
 

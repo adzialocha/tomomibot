@@ -18,24 +18,31 @@ class Runtime:
 
         self._display_welcome()
 
-        voice = Voice(voice_name)
-        reference_voice_name = kwargs.get('reference', None)
-        if reference_voice_name is not None:
-            reference_voice = Voice(reference_voice_name)
-        else:
-            reference_voice = None
+        self._server = Server(ctx)
 
         self._session = Session(self.ctx)
-        self._session.initialize(voice, model, reference_voice, **kwargs)
+
+        # Initialize the session directly when we pass a voice
+        # and model during startup, otherwise standby
+        if voice_name and model:
+            voice = Voice(voice_name)
+            reference_voice_name = kwargs.get('reference', None)
+            if reference_voice_name is not None:
+                reference_voice = Voice(reference_voice_name)
+            else:
+                reference_voice = None
+
+            self._session.initialize(voice, model, reference_voice, **kwargs)
 
         self._thread = None
 
     def initialize(self):
         self._init_signal()
+        self._server.start()
         self._session.start()
 
         # This is our main thread. Keep it alive!
-        while self._session.is_running:
+        while self._session.is_running or self._server.is_running:
             time.sleep(1)
 
     def _display_welcome(self):
@@ -72,30 +79,5 @@ class Runtime:
         self._handle_exit()
 
     def _handle_exit(self):
-        self._session.stop()
-
-
-class ServerRuntime(Runtime):
-
-    def __init__(self, ctx, **kwargs):
-        self.ctx = ctx
-
-        self._display_welcome()
-
-        self._server = Server(ctx)
-
-        self._session = Session(self.ctx)
-
-        self._thread = None
-
-    def initialize(self):
-        self._init_signal()
-        self._server.start()
-
-        # This is our main thread. Keep it alive!
-        while self._session.is_running:
-            time.sleep(1)
-
-    def _handle_exit(self):
-        self._session.stop()
         self._server.stop()
+        self._session.stop()

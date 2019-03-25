@@ -50,20 +50,24 @@ from tomomibot.const import (INTERVAL_SEC, INPUT_DEVICE, OUTPUT_CHANNEL,
               default=VOLUME,
               type=float,
               help='Volume of the audio output')
-@click.argument('voice')
-@click.argument('model')
+@click.argument('voice', required=False)
+@click.argument('model', required=False)
 @pass_context
 def cli(ctx, voice, model, **kwargs):
     """Start a live session with tomomibot."""
-    try:
-        check_valid_model(model)
-    except FileNotFoundError as err:
-        ctx.elog('Model "{}" is invalid: {}'.format(model, err))
-    else:
+    if voice and not model:
+        ctx.elog('Please define a model for the given voice')
+
+    if voice and model:
         try:
-            check_valid_voice(voice)
+            check_valid_model(model)
         except FileNotFoundError as err:
-            ctx.elog('Voice "{}" is invalid: {}'.format(voice, err))
+            ctx.elog('Model "{}" is invalid: {}'.format(model, err))
         else:
-            runtime = Runtime(ctx, voice, model, **kwargs)
-            runtime.initialize()
+            try:
+                check_valid_voice(voice)
+            except FileNotFoundError as err:
+                ctx.elog('Voice "{}" is invalid: {}'.format(voice, err))
+
+    runtime = Runtime(ctx, voice, model, **kwargs)
+    runtime.initialize()

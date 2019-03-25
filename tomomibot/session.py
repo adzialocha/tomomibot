@@ -110,6 +110,14 @@ class Session():
         self.ctx.log('Voice "{}" with {} samples'
                      .format(voice.name, len(voice.points)))
 
+    @property
+    def master_volume(self):
+        return self._audio.volume
+
+    @master_volume.setter
+    def master_volume(self, value):
+        self._audio.volume = value
+
     def start(self):
         if not self.is_initialized:
             return

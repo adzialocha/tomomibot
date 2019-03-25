@@ -11,14 +11,12 @@ class Server:
 
     def start(self):
         self.is_running = True
+
         # @TODO start the http server
 
         # @TODO start upd server
 
         # @TODO start websocket server
-
-        while self.is_running:
-            time.sleep(1)
 
     def stop(self):
         self.is_running = False
