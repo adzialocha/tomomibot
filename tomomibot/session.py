@@ -27,13 +27,15 @@ class Session():
     def __init__(self, ctx, voice, model, reference_voice=None, **kwargs):
         self.ctx = ctx
 
-        self.interval = kwargs.get('interval')
         self.num_classes = kwargs.get('num_classes')
         self.penalty = kwargs.get('penalty')
         self.samplerate = kwargs.get('samplerate')
         self.seq_len = kwargs.get('seq_len')
-        self.temperature = kwargs.get('temperature')
         self.threshold_db = kwargs.get('threshold')
+
+        # These parameters can be changed during performance
+        self._interval = kwargs.get('interval')
+        self._temperature = kwargs.get('temperature')
 
         try:
             self._audio = AudioIO(ctx,
@@ -53,6 +55,8 @@ class Session():
         self._thread.daemon = True
         self._play_thread = threading.Thread(target=self.play, args=())
         self._play_thread.daemon = True
+
+        self._lock = threading.Lock()
 
         # Prepare playing logic
         self._sequence = []
@@ -97,6 +101,28 @@ class Session():
     def master_volume(self, value):
         self._audio.volume = value
 
+    @property
+    def interval(self):
+        return self._interval
+
+    @interval.setter
+    def interval(self, value):
+        with self._lock:
+            self._interval = value
+
+    @property
+    def temperature(self):
+        return self._temperature
+
+    @temperature.setter
+    def temperature(self, value):
+        with self._lock:
+            self._temperature = value
+
+    def reset_sequence(self):
+        with self._lock:
+            self._sequence = []
+
     def start(self):
         self.is_running = True
 
@@ -115,7 +141,7 @@ class Session():
 
     def run(self):
         while self.is_running:
-            time.sleep(self.interval)
+            time.sleep(self._interval)
             if self.is_running:
                 self.tick()
 
@@ -221,7 +247,7 @@ class Session():
 
                 # Reweight the softmax distribution
                 result_reweighted = reweight_distribution(result,
-                                                          self.temperature)
+                                                          self._temperature)
                 result_class = np.argmax(result_reweighted)
 
                 # Decode to a position in PCA space

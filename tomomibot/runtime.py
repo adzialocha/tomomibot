@@ -18,8 +18,9 @@ class Runtime:
 
         self._display_welcome()
 
-        self._server = Server(ctx)
+        self._thread = None
 
+        # Prepare session
         voice = Voice(voice_name)
         reference_voice_name = kwargs.get('reference', None)
         if reference_voice_name is not None:
@@ -30,7 +31,11 @@ class Runtime:
         self._session = Session(self.ctx, voice,
                                 model, reference_voice, **kwargs)
 
-        self._thread = None
+        # Prepare OSC server
+        self._server = Server(ctx)
+
+        # Subscribe to OSC message handler
+        self._subscribe_events()
 
     def initialize(self):
         self._init_signal()
@@ -51,6 +56,20 @@ class Runtime:
         """)
         self.ctx.log('Version: %s' % __version__)
         self.ctx.log('Exit with [CTRL] + [C]\n')
+
+    def _subscribe_events(self):
+        @self._server.emitter.on('reset')
+        def on_reset():
+            self._session.reset_sequence()
+
+        @self._server.emitter.on('param')
+        def on_param(param_key, param_value):
+            if param_key == 'volume':
+                self._session.master_volume = param_value
+            elif param_key == 'temperature':
+                self._session.temperature = param_value
+            elif param_key == 'interval':
+                self._session.interval = param_value
 
     def _init_signal(self):
         if not sys.platform.startswith('win') and sys.stdin \
