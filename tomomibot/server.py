@@ -16,8 +16,8 @@ class Server:
         self.emitter = EventEmitter()
 
         # Prepare OSC message dispatcher and UDP server
-        self.port = kwargs.get('port', OSC_PORT)
-        self.address = kwargs.get('address', OSC_ADDRESS)
+        self.address = kwargs.get('osc_address', OSC_ADDRESS)
+        self.port = kwargs.get('osc_port', OSC_PORT)
 
         bind = (self.address, self.port)
 

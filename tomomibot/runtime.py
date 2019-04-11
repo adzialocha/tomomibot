@@ -32,7 +32,7 @@ class Runtime:
                                 model, reference_voice, **kwargs)
 
         # Prepare OSC server
-        self._server = Server(ctx)
+        self._server = Server(ctx, **kwargs)
 
         # Subscribe to OSC message handler
         self._subscribe_events()

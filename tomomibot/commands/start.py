@@ -6,7 +6,7 @@ from tomomibot.utils import check_valid_voice, check_valid_model
 from tomomibot.const import (INTERVAL_SEC, INPUT_DEVICE, OUTPUT_CHANNEL,
                              INPUT_CHANNEL, OUTPUT_DEVICE, SAMPLE_RATE,
                              THRESHOLD_DB, NUM_CLASSES, SEQ_LEN, TEMPERATURE,
-                             PENALTY, VOLUME)
+                             PENALTY, VOLUME, OSC_ADDRESS, OSC_PORT)
 
 
 @click.command('start', short_help='Start a live session')
@@ -50,6 +50,14 @@ from tomomibot.const import (INTERVAL_SEC, INPUT_DEVICE, OUTPUT_CHANNEL,
               default=VOLUME,
               type=float,
               help='Volume of the audio output')
+@click.option('--osc_address',
+              default=OSC_ADDRESS,
+              type=str,
+              help='Address of OSC server')
+@click.option('--osc_port',
+              default=OSC_PORT,
+              type=int,
+              help='Port of OSC server')
 @click.argument('voice')
 @click.argument('model')
 @pass_context
