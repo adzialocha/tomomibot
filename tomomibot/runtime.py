@@ -20,19 +20,15 @@ class Runtime:
 
         self._server = Server(ctx)
 
-        self._session = Session(self.ctx)
+        voice = Voice(voice_name)
+        reference_voice_name = kwargs.get('reference', None)
+        if reference_voice_name is not None:
+            reference_voice = Voice(reference_voice_name)
+        else:
+            reference_voice = None
 
-        # Initialize the session directly when we pass a voice
-        # and model during startup, otherwise standby
-        if voice_name and model:
-            voice = Voice(voice_name)
-            reference_voice_name = kwargs.get('reference', None)
-            if reference_voice_name is not None:
-                reference_voice = Voice(reference_voice_name)
-            else:
-                reference_voice = None
-
-            self._session.initialize(voice, model, reference_voice, **kwargs)
+        self._session = Session(self.ctx, voice,
+                                model, reference_voice, **kwargs)
 
         self._thread = None
 
