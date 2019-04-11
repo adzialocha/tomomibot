@@ -1,5 +1,6 @@
 import threading
 
+from pyee import EventEmitter
 from pythonosc import dispatcher, osc_server
 
 from tomomibot.const import OSC_ADDRESS, OSC_PORT
@@ -11,13 +12,18 @@ class Server:
         self.ctx = ctx
         self.is_running = False
 
+        # Provide an interface for event subscribers
+        self.emitter = EventEmitter()
+
+        # Prepare OSC message dispatcher and UDP server
         self.port = kwargs.get('port', OSC_PORT)
         self.address = kwargs.get('address', OSC_ADDRESS)
 
-        # Prepare OSC message dispatcher and UDP server
+        bind = (self.address, self.port)
+
         disp = dispatcher.Dispatcher()
         disp.map('/tomomibot/*', self._on_param)
-        bind = (self.address, self.port)
+
         self._server = osc_server.ThreadingOSCUDPServer(bind, disp)
 
     def start(self):
@@ -42,16 +48,12 @@ class Server:
 
         # Commands with no arguments
         if param == 'reset':
-            print('Le Reset!')
+            self.emitter.emit('reset')
             return
 
         # We expect one float argument from now on
         if not len(args) == 1 or type(args[0]) is not float:
             return
 
-        if param == 'volume':
-            print('Volume!', args[0])
-        elif param == 'temperature':
-            print('temperature', args[0])
-        elif param == 'interval':
-            print('interval', args[0])
+        if param in ['volume', 'temperature', 'interval']:
+            self.emitter.emit('param', param, args[0])
