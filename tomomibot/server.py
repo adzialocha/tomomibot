@@ -55,5 +55,8 @@ class Server:
         if not len(args) == 1 or type(args[0]) is not float:
             return
 
-        if param in ['volume', 'temperature', 'interval']:
+        if param in ['volume', 'temperature'] and 0 <= args[0] <= 1:
+            self.emitter.emit('param', param, args[0])
+
+        if param in ['interval'] and 0 <= args[0] <= 5:
             self.emitter.emit('param', param, args[0])
