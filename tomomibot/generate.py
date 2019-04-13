@@ -52,13 +52,12 @@ def generate_voice(ctx, file, name, db_threshold, block):
             y = np.mean(bl, axis=1)
 
             # Detect onsets
-            onsets, _ = detect_onsets(y, sr=sr, db_threshold=db_threshold)
+            onsets, _ = detect_onsets(y, sr=sr, db_threshold=-120)
 
             # Slice audio into parts, analyze mffcs and save them
             slices = slice_audio(y, onsets, offset=offset)
             for i in range(len(slices) - 1):
-                # Normalize slice audio signal
-                y_slice = librosa.util.normalize(slices[i][0])
+                y_slice = slices[i][0]
 
                 # Calculate MFCCs
                 mfcc = mfcc_features(y_slice, sr)
