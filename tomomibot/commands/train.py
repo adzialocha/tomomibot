@@ -11,6 +11,12 @@ from tomomibot.utils import check_valid_voice
 @click.option('--num_classes',
               default=NUM_CLASSES,
               help='Number of classes to cluster the dataset (k-means)')
+@click.option('--use_dynamics',
+              default=True,
+              help='Use dynamics (volume) classes')
+@click.option('--use_durations',
+              default=True,
+              help='Use duration classes (length of sound events)')
 @click.option('--batch_size',
               default=BATCH_SIZE,
               help='How many batches to train per step')

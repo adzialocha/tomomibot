@@ -21,6 +21,8 @@ class Voice:
         with open(onset_path) as file:
             data = json.load(file)
 
+            self.data = data
+
             # Extract informations from data
             self.mfccs = [wav['mfcc'] for wav in data]
             self.wavs = [make_wav_path(name, wav['id']) for wav in data]
@@ -28,7 +30,10 @@ class Voice:
                                int(wav['end'])] for wav in data]
 
             # Do we have information about the sample volumes?
+            self.has_rms = False
+
             if 'rms' in data[0]:
+                self.has_rms = True
                 rms_data = [wav['rms'] for wav in data]
 
                 # Calculate average volume

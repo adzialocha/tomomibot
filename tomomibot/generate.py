@@ -8,7 +8,10 @@ import soundfile as sf
 
 
 from tomomibot.audio import detect_onsets, slice_audio, mfcc_features
-from tomomibot.const import (GENERATED_FOLDER, ONSET_FILE, SILENCE_POINT)
+from tomomibot.const import GENERATED_FOLDER, ONSET_FILE
+
+
+SILENCE_DURATION_MIN = 50
 
 
 def generate_voice(ctx, file, name, db_threshold, block):
@@ -68,7 +71,7 @@ def generate_voice(ctx, file, name, db_threshold, block):
                 # Keep all information stored
                 data.append({'id': counter,
                              'mfcc': mfcc.tolist(),
-                             'rms': np.max(rms),
+                             'rms': np.float32(np.max(rms)).item(),
                              'start': np.uint32(slices[i][1]).item(),
                              'end': np.uint32(slices[i][2]).item()})
 
@@ -89,49 +92,91 @@ def generate_voice(ctx, file, name, db_threshold, block):
     ctx.log('saved .json file with analyzed data.')
 
 
+def find_silence(voice, sr=44100):
+    """Find silence in and in-between sound events"""
+    sequence = []
+    last_step = voice.data[0]
+    id_counter = 1
+
+    for step_index, step in enumerate(voice.data):
+        duration_between = ((step['start'] - last_step['end']) / sr) * 1000
+
+        # Add silence between sound events
+        if duration_between >= SILENCE_DURATION_MIN:
+            silence_step = {
+                'id': id_counter,
+                'rms': 0,
+                'rms_avg': 0,
+                'start': last_step['end'],
+                'end': step['start'],
+            }
+
+            sequence.append(silence_step)
+
+            id_counter += 1
+
+        converted_step = step.copy()
+
+        # Keep soundfile id
+        converted_step['sound_id'] = step['id']
+        converted_step['id'] = id_counter
+
+        # Store PCA data and average volume
+        converted_step['pca'] = voice.points[step_index]
+        if voice.has_rms:
+            converted_step['rms_avg'] = voice.rms_avg[step_index]
+
+        sequence.append(converted_step)
+
+        id_counter += 1
+        last_step = step
+
+    return sequence
+
+
 def generate_sequence(ctx, voice_primary, voice_secondary,
                       save_sequence=False):
     """Generate a trainable sequence of two voices playing together"""
     sequence = []
     counter = 0
 
-    # Skip generation when voices are the same
+    # Find events
+    steps_primary = find_silence(voice_primary)
+
+    # Check if voices are the same
     if voice_primary.name == voice_secondary.name:
-        sequence = [[point, point] for point in voice_primary.points]
-        counter = len(voice_primary.points)
+        sequence = [[s, s] for s in steps_primary]
+        counter = len(steps_primary)
     else:
-        # Project secondary voice points into the primary voice PCA space
-        points_secondary = voice_primary.project(voice_secondary.mfccs)
+        steps_secondary = find_silence(voice_secondary)
 
         # Go through all secondary sound events
-        with click.progressbar(length=len(points_secondary),
+        with click.progressbar(length=len(steps_secondary),
                                label='Progress') as bar:
-            for i, point in enumerate(points_secondary):
-                start = voice_secondary.positions[i][0]
-                end = voice_secondary.positions[i][1]
+            for i, step_secondary in enumerate(steps_secondary):
+                start = steps_secondary[i]['start']
+                end = steps_secondary[i]['end']
 
                 # Find a simultaneous sound event in primary voice
-                found_point = None
-                for j, point_primary in reversed(
-                        list(enumerate(voice_primary.points))):
-                    start_primary = voice_primary.positions[j][0]
-                    end_primary = voice_primary.positions[j][1]
+                found_step = None
+                for j, step_primary in reversed(
+                        list(enumerate(steps_primary))):
+                    start_primary = voice_primary[j]['start']
+                    end_primary = voice_primary[j]['end']
+
                     if not (end <= start_primary or start >= end_primary):
-                        found_point = point_primary.tolist()
+                        found_step = j
                         counter += 1
                         break
 
-                # Set silence marking point when nothing was played
-                if found_point is None:
-                    found_point = SILENCE_POINT
-
                 # Add played point to other
-                sequence.append([point.tolist(), found_point])
+                if found_step:
+                    sequence.append([step_primary, found_step])
 
                 bar.update(1)
 
     ctx.log('Sequence with {} events and {} targets generated.'.format(
-        len(points_secondary),
+        len(sequence),
         counter))
 
     # ... and save sequence file

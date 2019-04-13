@@ -5,8 +5,19 @@ ONSET_FILE = 'onset.json'
 
 # Sequence data & generate
 BLOCK_SEC = 120
-SILENCE_POINT = [0.0, 0.0]
 SILENCE_CLASS = 0
+DURATIONS = [
+    100,
+    250,
+    500,
+    750,
+    1000,
+    1250,
+    1500,
+    2000,
+    4000,
+    8000,
+]
 
 # Hyperparameters
 BATCH_SIZE = 32
@@ -14,6 +25,8 @@ DATA_SPLIT = 0.1
 DROPOUT = 0.0
 EPOCHS = 75
 NUM_CLASSES = 100
+NUM_CLASSES_DYNAMICS = 10
+NUM_CLASSES_DURATIONS = 10
 NUM_LAYERS = 2
 NUM_UNITS = 256
 SEQ_LEN = 3
