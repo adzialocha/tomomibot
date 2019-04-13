@@ -93,37 +93,42 @@ def generate_sequence(ctx, voice_primary, voice_secondary,
                       save_sequence=False):
     """Generate a trainable sequence of two voices playing together"""
     sequence = []
-
-    # Project secondary voice points into the primary voice PCA space
-    points_secondary = voice_primary.project(voice_secondary.mfccs)
     counter = 0
 
-    # Go through all secondary sound events
-    with click.progressbar(length=len(points_secondary),
-                           label='Progress') as bar:
-        for i, point in enumerate(points_secondary):
-            start = voice_secondary.positions[i][0]
-            end = voice_secondary.positions[i][1]
+    # Skip generation when voices are the same
+    if voice_primary.name == voice_secondary.name:
+        sequence = [[point, point] for point in voice_primary.points]
+        counter = len(voice_primary.points)
+    else:
+        # Project secondary voice points into the primary voice PCA space
+        points_secondary = voice_primary.project(voice_secondary.mfccs)
 
-            # Find a simultaneous sound event in primary voice
-            found_point = None
-            for j, point_primary in reversed(
-                    list(enumerate(voice_primary.points))):
-                start_primary = voice_primary.positions[j][0]
-                end_primary = voice_primary.positions[j][1]
-                if not (end <= start_primary or start >= end_primary):
-                    found_point = point_primary.tolist()
-                    counter += 1
-                    break
+        # Go through all secondary sound events
+        with click.progressbar(length=len(points_secondary),
+                               label='Progress') as bar:
+            for i, point in enumerate(points_secondary):
+                start = voice_secondary.positions[i][0]
+                end = voice_secondary.positions[i][1]
 
-            # Set silence marking point when nothing was played
-            if found_point is None:
-                found_point = SILENCE_POINT
+                # Find a simultaneous sound event in primary voice
+                found_point = None
+                for j, point_primary in reversed(
+                        list(enumerate(voice_primary.points))):
+                    start_primary = voice_primary.positions[j][0]
+                    end_primary = voice_primary.positions[j][1]
+                    if not (end <= start_primary or start >= end_primary):
+                        found_point = point_primary.tolist()
+                        counter += 1
+                        break
 
-            # Add played point to other
-            sequence.append([point.tolist(), found_point])
+                # Set silence marking point when nothing was played
+                if found_point is None:
+                    found_point = SILENCE_POINT
 
-            bar.update(1)
+                # Add played point to other
+                sequence.append([point.tolist(), found_point])
+
+                bar.update(1)
 
     ctx.log('Sequence with {} events and {} targets generated.'.format(
         len(points_secondary),
