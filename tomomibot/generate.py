@@ -62,9 +62,13 @@ def generate_voice(ctx, file, name, db_threshold, block):
                 # Calculate MFCCs
                 mfcc = mfcc_features(y_slice, sr)
 
+                # RMS Volume
+                rms = librosa.feature.rms(y=y_slice)
+
                 # Keep all information stored
                 data.append({'id': counter,
                              'mfcc': mfcc.tolist(),
+                             'rms': np.max(rms),
                              'start': np.uint32(slices[i][1]).item(),
                              'end': np.uint32(slices[i][2]).item()})
 
