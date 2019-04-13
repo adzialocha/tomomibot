@@ -24,7 +24,8 @@ class Voice:
             # Extract informations from data
             self.mfccs = [wav['mfcc'] for wav in data]
             self.wavs = [make_wav_path(name, wav['id']) for wav in data]
-            self.positions = [[wav['start'], wav['end']] for wav in data]
+            self.positions = [[int(wav['start']),
+                               int(wav['end'])] for wav in data]
 
             # Do we have information about the sample volumes?
             if 'rms' in data[0]:
