@@ -28,7 +28,7 @@ def is_silent(y, threshold_db):
     return np.max(get_db(y)) < threshold_db
 
 
-def pca(features, components=2):
+def pca(features, components=6):
     """Dimension reduction via Principal Component Analysis (PCA)"""
     pca = PCA(n_components=components)
     transformed = pca.fit(features).transform(features)
