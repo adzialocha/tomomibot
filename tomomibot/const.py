@@ -6,6 +6,7 @@ ONSET_FILE = 'onset.json'
 # Sequence data & generate
 BLOCK_SEC = 120
 SILENCE_POINT = [0.0, 0.0]
+SILENCE_CLASS = 0
 
 # Hyperparameters
 BATCH_SIZE = 32

@@ -7,7 +7,7 @@ from sklearn.cluster import KMeans
 import click
 import numpy as np
 
-from tomomibot.const import MODELS_FOLDER
+from tomomibot.const import MODELS_FOLDER, SILENCE_CLASS, SILENCE_POINT
 from tomomibot.generate import generate_sequence
 from tomomibot.utils import line
 from tomomibot.voice import Voice
@@ -26,8 +26,12 @@ def k_means_encode_data(data, num_clusters):
     for column in data:
         new_column = []
         for point in column:
-            predicted = kmeans.predict([point])[0]
-            new_column.append(predicted)
+            if point is SILENCE_POINT:
+                new_column.append(SILENCE_CLASS)
+            else:
+                # Add +1 to class for silence class
+                predicted = kmeans.predict([point])[0] + 1
+                new_column.append(predicted)
         new_data.append(new_column)
     return np.array(new_data), kmeans
 
@@ -37,7 +41,8 @@ def k_means_decode_data(data, kmeans):
     for column in data:
         new_column = []
         for cluster_index in column:
-            center = kmeans.cluster_centers_[cluster_index]
+            # -1 to remove silence class
+            center = kmeans.cluster_centers_[cluster_index - 1]
             new_column.append(center)
         new_data.append(new_column)
     return np.array(new_data)
