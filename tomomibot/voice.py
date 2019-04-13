@@ -8,6 +8,9 @@ from tomomibot.const import GENERATED_FOLDER, ONSET_FILE
 from tomomibot.utils import make_wav_path
 
 
+KERNEL_SIZE = 8
+
+
 class Voice:
 
     def __init__(self, name, **kwargs):
@@ -22,6 +25,18 @@ class Voice:
             self.mfccs = [wav['mfcc'] for wav in data]
             self.wavs = [make_wav_path(name, wav['id']) for wav in data]
             self.positions = [[wav['start'], wav['end']] for wav in data]
+
+            # Do we have information about the sample volumes?
+            if 'rms' in data[0]:
+                rms_data = [wav['rms'] for wav in data]
+
+                # Calculate average volume
+                kernel = np.array(np.full((KERNEL_SIZE,), 1)) / KERNEL_SIZE
+                rms_avg_data = np.convolve(rms_data, kernel, 'same')
+
+                # Normalize rms values and store them
+                self.rms = rms_data / np.max(rms_data)
+                self.rms_avg = rms_avg_data / np.max(rms_avg_data)
 
             self.fit()
 
