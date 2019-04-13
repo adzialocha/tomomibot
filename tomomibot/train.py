@@ -49,17 +49,17 @@ def generator(data, seq_len, min_index, max_index, batch_size):
     while 1:
         if i + batch_size >= max_index:
             i = min_index
-        rows = np.arange(i, min(i + batch_size, max_index))
+        rows = np.arange(i, min(i + batch_size, max_index - 1))
         i += len(rows)
 
         samples = np.zeros((len(rows), seq_len), dtype='int32')
         targets = np.zeros((len(rows)), dtype='int32')
 
         for j, _ in enumerate(rows):
-            indices = range(rows[j], rows[j] + seq_len)
+            indices = range(rows[j], rows[j] + seq_len + 1)
             if indices[-1] < max_index:
                 targets[j] = data[:, 0][indices][-1]
-                samples[j] = data[:, 1][indices]
+                samples[j] = data[:, 1][indices:seq_len]
 
         yield samples, targets
 
