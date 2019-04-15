@@ -39,6 +39,7 @@ def check_valid_model(name):
 
 def check_valid_voice(name):
     """Checks if a voice is given and contains all needed files"""
+    version = None
     voice_dir = os.path.join(os.getcwd(), GENERATED_FOLDER, name)
     if not os.path.isdir(voice_dir):
         raise FileNotFoundError('Could not find voice folder')
@@ -69,6 +70,8 @@ def check_valid_voice(name):
                 raise FileNotFoundError(
                     'Could not find wav file "{}" in voice folder'.format(
                         wav_path))
+
+    return version
 
 
 def get_num_classes(num_sound_classes,

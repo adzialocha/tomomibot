@@ -296,6 +296,9 @@ class Session():
                     self.use_dynamics,
                     self.use_durations)
 
+                self.ctx.vlog('sound={} dynamic={} duration={}'.format(
+                    class_sound, class_dynamic, class_duration))
+
                 # Do not do anything when this is silence ..
                 if class_sound != SILENCE_CLASS:
                     # Find closest sound to this point
