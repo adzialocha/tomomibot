@@ -143,6 +143,7 @@ def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
     ctx.log('data_split:\t{}'.format(data_split))
     ctx.log('seq_len:\t{}'.format(seq_len))
     ctx.log('epochs:\t\t{}'.format(epochs))
+    ctx.log('dropout:\t\t{}'.format(dropout))
     if not resume:
         ctx.log('num_layers:\t{}'.format(num_layers))
         ctx.log('num_units:\t{}'.format(num_units))
