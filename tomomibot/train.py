@@ -7,10 +7,10 @@ from sklearn.cluster import KMeans
 import click
 import numpy as np
 
-from tomomibot.const import (MODELS_FOLDER, SILENCE_CLASS, DURATIONS,
-                             NUM_CLASSES_DYNAMICS, NUM_CLASSES_DURATIONS)
+from tomomibot.const import MODELS_FOLDER, SILENCE_CLASS
 from tomomibot.generate import generate_sequence
-from tomomibot.utils import line
+from tomomibot.utils import (line, encode_duration_class, encode_dynamic_class,
+                             encode_feature_vector, get_num_classes)
 from tomomibot.voice import Voice
 
 
@@ -18,17 +18,6 @@ def reweight_distribution(original_distribution, temperature):
     distribution = np.log(original_distribution) / temperature
     distribution = np.exp(distribution)
     return distribution / np.sum(distribution)
-
-
-def encode_duration_class(duration):
-    duration_class = NUM_CLASSES_DURATIONS - 1
-
-    for duration_def_class, duration_def in enumerate(DURATIONS):
-        if duration < duration_def:
-            duration_class = duration_def_class
-            break
-
-    return duration_class
 
 
 def encode_data(sequence, num_clusters, use_dynamics, use_durations, sr):
@@ -56,46 +45,21 @@ def encode_data(sequence, num_clusters, use_dynamics, use_durations, sr):
 
             # Define dynamic class
             if use_dynamics:
-                if class_sound == SILENCE_CLASS:
-                    class_dynamic = 0
-                else:
-                    class_dynamic = int(round(
-                        voice['rms_avg'] * (NUM_CLASSES_DYNAMICS - 1)))
+                class_dynamic = encode_dynamic_class(class_sound,
+                                                     voice['rms_avg'])
 
             # Define duration class
             if use_durations:
                 duration = (voice['end'] - voice['start']) / sr * 1000
                 class_duration = encode_duration_class(duration)
 
-            # Define feature vector and matrix
-            if not use_dynamics and not use_durations:
-                feature_vector = class_sound
-                feature_matrix = np.zeros((num_clusters + 1))
-            else:
-                feature_vector = [class_sound]
-
-                if use_dynamics:
-                    feature_vector.append(class_dynamic)
-
-                if use_durations:
-                    feature_vector.append(class_duration)
-
-                if use_dynamics and not use_durations:
-                    feature_matrix = np.zeros((num_clusters + 1,
-                                               NUM_CLASSES_DYNAMICS))
-                elif not use_dynamics and use_durations:
-                    feature_matrix = np.zeros((num_clusters + 1,
-                                               NUM_CLASSES_DURATIONS))
-                else:
-                    feature_matrix = np.zeros((num_clusters + 1,
-                                               NUM_CLASSES_DYNAMICS,
-                                               NUM_CLASSES_DURATIONS))
-
-            # Encode sequence
-            if use_dynamics or use_durations:
-                feature_vector = np.ravel_multi_index(feature_vector,
-                                                      feature_matrix.shape)
-                feature_vector = np.array(feature_vector)
+            # Get final feature vector
+            feature_vector = encode_feature_vector(num_clusters,
+                                                   class_sound,
+                                                   class_dynamic,
+                                                   class_duration,
+                                                   use_dynamics,
+                                                   use_durations)
 
             new_step.append(feature_vector)
 
@@ -164,11 +128,9 @@ def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
     num_units = kwargs.get('num_units')
 
     # Calculate number of total classes
-    num_classes = num_sound_classes + 1  # .. add silence class
-    if use_dynamics:
-        num_classes *= NUM_CLASSES_DYNAMICS
-    if use_durations:
-        num_classes *= NUM_CLASSES_DURATIONS
+    num_classes = get_num_classes(num_sound_classes,
+                                  use_dynamics,
+                                  use_durations)
 
     ctx.log('\nParameters:')
     ctx.log(line(length=32))
@@ -256,6 +218,13 @@ def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
             ctx.elog(
                 'Could not load model: {}'.format(err))
             sys.exit(1)
+
+        num_model_classes = model.layers[-1].output_shape[1]
+        if num_model_classes != num_classes:
+            ctx.elog('The given model was trained with a different '
+                     'amount of classes: given {}, but '
+                     'should be {}.'.format(num_classes,
+                                            num_model_classes))
     else:
         model = Sequential()
         model.add(layers.Embedding(input_dim=num_classes,

@@ -11,9 +11,13 @@ import tensorflow as tf
 
 from tomomibot.audio import (AudioIO, slice_audio, detect_onsets,
                              is_silent, mfcc_features, get_db)
-from tomomibot.const import MODELS_FOLDER
+from tomomibot.const import MODELS_FOLDER, SILENCE_CLASS
 from tomomibot.train import reweight_distribution
-from tomomibot.utils import plot_position
+from tomomibot.utils import (get_num_classes,
+                             encode_duration_class,
+                             encode_dynamic_class,
+                             encode_feature_vector,
+                             decode_classes)
 
 
 CHECK_WAV_INTERVAL = 0.1        # Check .wav queue interval (in seconds)
@@ -27,7 +31,10 @@ class Session():
     def __init__(self, ctx, voice, model, reference_voice=None, **kwargs):
         self.ctx = ctx
 
-        self.num_classes = kwargs.get('num_classes')
+        self.num_sound_classes = kwargs.get('num_classes')
+        self.use_dynamics = kwargs.get('dynamics')
+        self.use_durations = kwargs.get('durations')
+
         self.penalty = kwargs.get('penalty')
         self.samplerate = kwargs.get('samplerate')
         self.seq_len = kwargs.get('seq_len')
@@ -37,6 +44,7 @@ class Session():
         self._interval = kwargs.get('interval')
         self._temperature = kwargs.get('temperature')
 
+        # Prepare audio I/O
         try:
             self._audio = AudioIO(ctx,
                                   samplerate=self.samplerate,
@@ -45,14 +53,15 @@ class Session():
                                   channel_in=kwargs.get('input_channel'),
                                   channel_out=kwargs.get('output_channel'),
                                   volume=kwargs.get('volume'))
-        except IndexError as err:
+        except RuntimeError as err:
             self.ctx.elog(err)
 
         self.ctx.log('Loading ..')
 
-        # Prepare parallel tasks
+        # Prepare concurrent threads
         self._thread = threading.Thread(target=self.run, args=())
         self._thread.daemon = True
+
         self._play_thread = threading.Thread(target=self.play, args=())
         self._play_thread.daemon = True
 
@@ -73,6 +82,18 @@ class Session():
         self._model._make_predict_function()
         self._graph = tf.get_default_graph()
 
+        # Calculate number of total classes
+        num_classes = get_num_classes(self.num_sound_classes,
+                                      self.use_dynamics,
+                                      self.use_durations)
+
+        num_model_classes = self._model.layers[-1].output_shape[1]
+        if num_model_classes != num_classes:
+            self.ctx.elog('The given model was trained with a different '
+                          'amount of classes: given {}, but '
+                          'should be {}.'.format(num_classes,
+                                                 num_model_classes))
+
         # Prepare voice and k-means clustering
         if reference_voice is None:
             reference_voice = voice
@@ -80,13 +101,13 @@ class Session():
             voice.fit(reference_voice)
 
         self._voice = voice
-        self._kmeans = KMeans(n_clusters=self.num_classes)
+        self._kmeans = KMeans(n_clusters=self.num_sound_classes)
         self._kmeans.fit(reference_voice.points)
 
         # Get the classes of the voice sound material / points
         point_classes = self._kmeans.predict(self._voice.points)
         self._point_classes = []
-        for idx in range(self.num_classes):
+        for idx in range(num_classes):
             indices = np.where(point_classes == idx)
             self._point_classes.append(indices[0])
 
@@ -204,24 +225,42 @@ class Session():
 
         # Analyze and categorize slices
         for y in slices:
-            # Normalize slice audio signal
-            y_slice = librosa.util.normalize(y[0])
+            y_slice = y[0]
 
             # Calculate MFCCs
             try:
                 mfcc = mfcc_features(y_slice, self.samplerate)
+            except RuntimeError:
+                self.ctx.vlog(
+                    'Not enough sample data for MFCC analysis')
+            else:
+                # Calculate RMS
+                rms_data = librosa.feature.rms(y=y_slice)
+                rms = np.float32(np.max(rms_data)).item()
 
                 # Project point into given voice PCA space
                 point = self._voice.project([mfcc])[0].flatten()
 
                 # Predict k-means class from point
-                point_class = self._kmeans.predict([point])[0]
+                class_sound = self._kmeans.predict([point])[0]
+
+                # Get dynamic class
+                class_dynamic = encode_dynamic_class(class_sound, rms)
+
+                # Get duration class
+                duration = len(y_slice) / self.samplerate * 1000
+                class_duration = encode_duration_class(duration)
+
+                # Encode it!
+                feature_vector = encode_feature_vector(self.num_sound_classes,
+                                                       class_sound,
+                                                       class_dynamic,
+                                                       class_duration,
+                                                       self.use_dynamics,
+                                                       self.use_durations)
 
                 # Add it to our sequence queue
-                self._sequence.append(point_class)
-            except ValueError:
-                self.ctx.vlog(
-                    'Not enough sample data for MFCC analysis')
+                self._sequence.append(feature_vector)
 
         # Check for too long sequences, cut it if necessary
         penalty = self.seq_len * self.penalty
@@ -250,18 +289,23 @@ class Session():
                                                           self._temperature)
                 result_class = np.argmax(result_reweighted)
 
-                # Decode to a position in PCA space
-                point_index = None
-                if len(self._point_classes[result_class]):
-                    point_index = np.random.choice(
-                        self._point_classes[result_class])
+                # Decode class back into sub classes
+                class_sound, class_dynamic, class_duration = decode_classes(
+                    result_class,
+                    self.num_sound_classes,
+                    self.use_dynamics,
+                    self.use_durations)
 
-                if point_index:
+                # Do not do anything when this is silence ..
+                if class_sound != SILENCE_CLASS:
                     # Find closest sound to this point
-                    position = self._voice.points[point_index]
-                    self._wavs.append(self._voice.find_wav(position))
-                    if not self.ctx.verbose:
-                        self.ctx.log(plot_position(position))
+                    wav = self._voice.find_wav(self._point_classes,
+                                               class_sound,
+                                               class_dynamic,
+                                               class_duration)
+
+                    if wav:
+                        self._wavs.append(wav)
 
                 max_index -= 1
 

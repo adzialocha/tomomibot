@@ -3,7 +3,9 @@ import os
 
 import numpy as np
 
-from tomomibot.const import GENERATED_FOLDER, ONSET_FILE, MODELS_FOLDER
+from tomomibot.const import (GENERATED_FOLDER, ONSET_FILE, MODELS_FOLDER,
+                             DURATIONS, NUM_CLASSES_DURATIONS,
+                             NUM_CLASSES_DYNAMICS, SILENCE_CLASS)
 
 
 def line(char='-', length=48):
@@ -69,20 +71,110 @@ def check_valid_voice(name):
                         wav_path))
 
 
-def plot_position(position, x_size=20, y_size=10):
-    point_x = np.floor(((position[0] + 1.0) / 2.0) * x_size)
-    point_y = np.floor(((position[1] + 1.0) / 2.0) * y_size)
+def get_num_classes(num_sound_classes,
+                    use_dynamics, use_durations):
+    """Calculate how many classes the model can predict"""
+    num_classes = num_sound_classes + 1  # .. add silence class
+    if use_dynamics:
+        num_classes *= NUM_CLASSES_DYNAMICS
+    if use_durations:
+        num_classes *= NUM_CLASSES_DURATIONS
 
-    strb = ''
+    return num_classes
 
-    for y in reversed(range(y_size + 1)):
-        line = ''
-        for x in range(x_size + 1):
-            if point_x == x and point_y == y:
-                char = '▪'
-            else:
-                char = '█'
-            line += char
-        strb += line + '\n'
 
-    return strb
+def get_feature_matrix(num_sound_classes, use_dynamics, use_durations):
+    """Returns the matrix of our features"""
+    if not use_dynamics and not use_durations:
+        feature_matrix = np.zeros((num_sound_classes + 1))
+    elif use_dynamics and not use_durations:
+        feature_matrix = np.zeros((num_sound_classes + 1,
+                                   NUM_CLASSES_DYNAMICS))
+    elif not use_dynamics and use_durations:
+        feature_matrix = np.zeros((num_sound_classes + 1,
+                                   NUM_CLASSES_DURATIONS))
+    else:
+        feature_matrix = np.zeros((num_sound_classes + 1,
+                                   NUM_CLASSES_DYNAMICS,
+                                   NUM_CLASSES_DURATIONS))
+
+    return feature_matrix
+
+
+def encode_duration_class(duration):
+    """Translate ms into a duration class"""
+    duration_class = NUM_CLASSES_DURATIONS - 1
+
+    for duration_def_class, duration_def in enumerate(DURATIONS):
+        if duration < duration_def:
+            duration_class = duration_def_class
+            break
+
+    return duration_class
+
+
+def encode_dynamic_class(class_sound, rms):
+    """Translate RMS into a dynamic class"""
+    if class_sound == SILENCE_CLASS:
+        class_dynamic = 0
+    else:
+        class_dynamic = int(round(rms * (NUM_CLASSES_DYNAMICS - 1)))
+
+    return class_dynamic
+
+
+def encode_feature_vector(num_sound_classes, class_sound,
+                          class_dynamic=None, class_duration=None,
+                          use_dynamics=False, use_durations=False):
+    """Translate sound, dynamic and duration classes into an indexed class"""
+    # Define feature vector and matrix
+    feature_matrix = get_feature_matrix(num_sound_classes,
+                                        use_dynamics,
+                                        use_durations)
+
+    if not use_dynamics and not use_durations:
+        feature_vector = class_sound
+    else:
+        feature_vector = [class_sound]
+
+        if use_dynamics:
+            feature_vector.append(class_dynamic)
+
+        if use_durations:
+            feature_vector.append(class_duration)
+
+    # Encode sequence
+    if use_dynamics or use_durations:
+        feature_vector = np.ravel_multi_index(feature_vector,
+                                              feature_matrix.shape)
+        feature_vector = np.array(feature_vector)
+
+    return feature_vector
+
+
+def decode_classes(class_index, num_sound_classes,
+                   use_dynamics, use_durations):
+    """Translate indexed class back into sound, dynamic and duration classes"""
+    class_dynamic = None
+    class_duration = None
+
+    if not use_dynamics and not use_durations:
+        class_sound = class_index
+    else:
+        feature_matrix = get_feature_matrix(num_sound_classes,
+                                            use_dynamics,
+                                            use_durations)
+
+        feature_vector = np.unravel_index([class_index], feature_matrix)[0]
+
+        class_sound = feature_vector[0]
+
+        if use_dynamics and not use_durations:
+            class_dynamic = feature_vector[1]
+        elif not use_dynamics and use_durations:
+            class_duration = feature_vector[1]
+        else:
+            class_dynamic = feature_vector[1]
+            class_duration = feature_vector[2]
+
+    return class_sound, class_dynamic, class_duration

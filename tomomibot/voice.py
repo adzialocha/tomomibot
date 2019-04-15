@@ -5,7 +5,7 @@ import numpy as np
 
 from tomomibot.audio import pca
 from tomomibot.const import GENERATED_FOLDER, ONSET_FILE
-from tomomibot.utils import make_wav_path
+from tomomibot.utils import make_wav_path, encode_duration_class
 
 
 class Voice:
@@ -31,8 +31,26 @@ class Voice:
                 self.sequence = data['sequence']
                 self.meta = data['meta']
 
-            self.wavs = [
-                make_wav_path(name, wav['id']) for wav in self.sequence]
+            # Prepare wav file informations for playback
+            wavs = []
+            for wav in self.sequence:
+                wav_entry = {
+                    'path': make_wav_path(name, wav['id']),
+                }
+
+                if self.version == 2:
+                    duration = (
+                        int(wav['end']) - int(wav['start'])
+                    ) / self.meta['samplerate'] * 1000
+
+                    wav_entry['class_dynamic'] = encode_duration_class(
+                        None, wav['rms'])
+                    wav_entry['class_duration'] = encode_duration_class(
+                        duration)
+
+                wavs.append(wav_entry)
+
+            self.wavs = np.array(wavs)
 
             self.fit()
 
@@ -54,9 +72,29 @@ class Voice:
         points = self._pca_instance.transform(vectors)
         return self._pca_scaler.transform(points)
 
-    def find_wav(self, point):
-        """Find closest point and return its wav file path"""
-        deltas = self.points - point
-        dist_2 = np.einsum('ij,ij->i', deltas, deltas)
-        index = np.argmin(dist_2)
-        return self.wavs[index]
+    def find_wav(self, point_classes,
+                 class_sound, class_dynamic, class_duration):
+        """Return wav path depending on sound, duration and dynamic"""
+        indices = point_classes[class_sound]
+        possible_wavs = self.wavs[indices]
+
+        if self.version == 2:
+            # Filter by dynamic class
+            if class_dynamic:
+                possible_wavs = list(
+                    filter(lambda x: x['class_dynamic'] == class_dynamic,
+                           possible_wavs))
+
+            # Filter by duration class
+            if class_duration:
+                possible_wavs = list(
+                    filter(lambda x: x['class_duration'] == class_duration,
+                           possible_wavs))
+
+        if len(possible_wavs) == 0:
+            return None
+
+        # Pick a random sound from that group
+        wav = np.random.choice(possible_wavs)
+
+        return wav['path']
