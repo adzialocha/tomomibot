@@ -7,9 +7,10 @@ from sklearn.cluster import KMeans
 import click
 import numpy as np
 
-from tomomibot.const import MODELS_FOLDER
+from tomomibot.const import MODELS_FOLDER, SILENCE_CLASS
 from tomomibot.generate import generate_sequence
-from tomomibot.utils import line
+from tomomibot.utils import (line, encode_duration_class, encode_dynamic_class,
+                             encode_feature_vector, get_num_classes)
 from tomomibot.voice import Voice
 
 
@@ -19,28 +20,54 @@ def reweight_distribution(original_distribution, temperature):
     return distribution / np.sum(distribution)
 
 
-def k_means_encode_data(data, num_clusters):
+def encode_data(sequence, num_clusters, use_dynamics, use_durations, sr):
+    dataset = []
+
+    # KMeans clustering of primary voice PCA sequence
+    pca_data = []
+    for step in sequence:
+        if 'pca' in step[0]:
+            pca_data.append(step[0]['pca'])
     kmeans = KMeans(n_clusters=num_clusters)
-    kmeans.fit(data[:, 0])
-    new_data = []
-    for column in data:
-        new_column = []
-        for point in column:
-            predicted = kmeans.predict([point])[0]
-            new_column.append(predicted)
-        new_data.append(new_column)
-    return np.array(new_data), kmeans
+    kmeans.fit(pca_data)
 
+    # Encode both voices
+    for step in sequence:
+        new_step = []
 
-def k_means_decode_data(data, kmeans):
-    new_data = []
-    for column in data:
-        new_column = []
-        for cluster_index in column:
-            center = kmeans.cluster_centers_[cluster_index]
-            new_column.append(center)
-        new_data.append(new_column)
-    return np.array(new_data)
+        for voice in step:
+            class_dynamic = None
+            class_duration = None
+
+            # Define sound class
+            if voice['id'] is None:
+                class_sound = SILENCE_CLASS
+            else:
+                # +1 for silence
+                class_sound = kmeans.predict([voice['pca']])[0] + 1
+
+            # Define dynamic class
+            if use_dynamics:
+                class_dynamic = encode_dynamic_class(class_sound,
+                                                     voice['rms_avg'])
+
+            # Define duration class
+            if use_durations:
+                duration = (voice['end'] - voice['start']) / sr * 1000
+                class_duration = encode_duration_class(duration)
+
+            # Get final feature vector
+            feature_vector = encode_feature_vector(num_clusters,
+                                                   class_sound,
+                                                   class_dynamic,
+                                                   class_duration,
+                                                   use_dynamics,
+                                                   use_durations)
+
+            new_step.append(feature_vector)
+
+        dataset.append(new_step)
+    return np.array(dataset)
 
 
 def generator(data, seq_len, min_index, max_index, batch_size):
@@ -49,23 +76,37 @@ def generator(data, seq_len, min_index, max_index, batch_size):
     while 1:
         if i + batch_size >= max_index:
             i = min_index
-        rows = np.arange(i, min(i + batch_size, max_index))
+        rows = np.arange(i, min(i + batch_size, max_index - 1))
         i += len(rows)
 
         samples = np.zeros((len(rows), seq_len), dtype='int32')
         targets = np.zeros((len(rows)), dtype='int32')
 
         for j, _ in enumerate(rows):
-            indices = range(rows[j], rows[j] + seq_len)
+            indices = range(rows[j], rows[j] + seq_len + 1)
             if indices[-1] < max_index:
                 targets[j] = data[:, 0][indices][-1]
-                samples[j] = data[:, 1][indices]
+                samples[j] = data[:, 1][indices[:seq_len]]
 
         yield samples, targets
 
 
 def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
     """Train a LSTM neural network on sequence data from a performance"""
+
+    # Prepare voices
+    primary_voice = Voice(primary_voice)
+    secondary_voice = Voice(secondary_voice)
+
+    if primary_voice.version < 2 or secondary_voice.version < 2:
+        ctx.elog('Given voices were generated with an too old version.')
+
+    sr = primary_voice.meta['samplerate']
+
+    if sr != secondary_voice.meta['samplerate']:
+        ctx.elog('Voices need same samplerates for correct training.')
+
+    # Prepare model
     model_name = '{}.h5'.format(name)
     model_path = os.path.join(os.getcwd(), MODELS_FOLDER, model_name)
     resume = False
@@ -77,7 +118,10 @@ def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
         resume = True
 
     # Parameters and Hyperparameters
-    num_classes = kwargs.get('num_classes')
+    use_dynamics = kwargs.get('dynamics')
+    use_durations = kwargs.get('durations')
+
+    num_sound_classes = kwargs.get('num_classes')
     batch_size = kwargs.get('batch_size')
     data_split = kwargs.get('data_split')
     seq_len = kwargs.get('seq_len')
@@ -85,6 +129,11 @@ def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
     epochs = kwargs.get('epochs')
     num_layers = kwargs.get('num_layers')
     num_units = kwargs.get('num_units')
+
+    # Calculate number of total classes
+    num_classes = get_num_classes(num_sound_classes,
+                                  use_dynamics,
+                                  use_durations)
 
     ctx.log('\nParameters:')
     ctx.log(line(length=32))
@@ -100,22 +149,26 @@ def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
     ctx.log(line(length=32))
     ctx.log('')
 
-    primary_voice = Voice(primary_voice)
-    secondary_voice = Voice(secondary_voice)
-
     # Generate training data from voice sequences
     ctx.log(click.style('1. Generate training data from voices', bold=True))
     ctx.log('Primary voice: "{}"'.format(primary_voice.name))
     ctx.log('Secondary voice: "{}"'.format(secondary_voice.name))
 
-    data = generate_sequence(ctx, primary_voice, secondary_voice,
+    data = generate_sequence(ctx,
+                             primary_voice,
+                             secondary_voice,
                              save_sequence=kwargs.get('save_sequence'))
 
     ctx.log('')
 
     # Encode data before training
     ctx.log(click.style('2. Encode data before training', bold=True))
-    encoded_data, kmeans = k_means_encode_data(data, num_classes)
+    encoded_data = encode_data(data,
+                               num_sound_classes,
+                               use_dynamics,
+                               use_durations,
+                               sr)
+
     ctx.log('Number of classes: {}\n'.format(num_classes))
 
     # Split in 3 sets for training, validation and testing
@@ -168,6 +221,13 @@ def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
             ctx.elog(
                 'Could not load model: {}'.format(err))
             sys.exit(1)
+
+        num_model_classes = model.layers[-1].output_shape[1]
+        if num_model_classes != num_classes:
+            ctx.elog('The given model was trained with a different '
+                     'amount of classes: given {}, but '
+                     'should be {}.'.format(num_classes,
+                                            num_model_classes))
     else:
         model = Sequential()
         model.add(layers.Embedding(input_dim=num_classes,
@@ -201,8 +261,8 @@ def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
 
     # Evaluate training
     ctx.log(click.style('6. Evaluation', bold=True))
-    scores = []
-    max_dist = .25
+    score = 0
+    total = 0
 
     for i in range((training_steps // batch_size)):
         # Predict point from model
@@ -210,21 +270,16 @@ def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
         results = model.predict(samples)
 
         for j, result in enumerate(results):
-            # Decode data
-            result_value = np.argmax(result)
-            position = k_means_decode_data([[result_value]], kmeans).flatten()
-            position_target = k_means_decode_data([[targets[j]]], kmeans)
-            position_target = position_target.flatten()
+            result_class = np.argmax(result)
+            target_class = targets[j]
 
-            # Calculate distance between prediction and actual test target
-            dist = max_dist - min(
-                max_dist,
-                np.linalg.norm(position - position_target))
-            scores.append(0.0 if dist == 0.0 else dist / max_dist)
+            if result_class == target_class:
+                score += 1
+            total += 1
 
-    score = np.average(scores)
+    ratio = score / total
 
-    ctx.log('Score: {0:.2f}%\n'.format(score * 100))
+    ctx.log('Score: {0:.2f}%\n'.format(ratio * 100))
 
     # Save model
     ctx.log(click.style('7. Store model weights', bold=True))

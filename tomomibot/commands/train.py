@@ -1,16 +1,23 @@
 import click
 
 from tomomibot.cli import pass_context
-from tomomibot.const import (NUM_UNITS, NUM_LAYERS, NUM_CLASSES, DROPOUT,
-                             BATCH_SIZE, DATA_SPLIT, SEQ_LEN, EPOCHS)
+from tomomibot.const import (NUM_UNITS, NUM_LAYERS, NUM_CLASSES_SOUNDS,
+                             DROPOUT, BATCH_SIZE, DATA_SPLIT,
+                             SEQ_LEN, EPOCHS)
 from tomomibot.train import train_sequence_model
 from tomomibot.utils import check_valid_voice
 
 
 @click.command('train', short_help='Train a model for sequence prediction')
 @click.option('--num_classes',
-              default=NUM_CLASSES,
-              help='Number of classes to cluster the dataset (k-means)')
+              default=NUM_CLASSES_SOUNDS,
+              help='Number of sound classes to cluster the dataset (k-means)')
+@click.option('--dynamics/--no_dynamics',
+              default=False,
+              help='Use dynamics (volume) classes')
+@click.option('--durations/--no_durations',
+              default=False,
+              help='Use duration classes (length of sound events)')
 @click.option('--batch_size',
               default=BATCH_SIZE,
               help='How many batches to train per step')

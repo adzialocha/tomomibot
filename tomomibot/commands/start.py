@@ -5,7 +5,8 @@ from tomomibot.runtime import Runtime
 from tomomibot.utils import check_valid_voice, check_valid_model
 from tomomibot.const import (INTERVAL_SEC, INPUT_DEVICE, OUTPUT_CHANNEL,
                              INPUT_CHANNEL, OUTPUT_DEVICE, SAMPLE_RATE,
-                             THRESHOLD_DB, NUM_CLASSES, SEQ_LEN, TEMPERATURE,
+                             THRESHOLD_DB, NUM_CLASSES_SOUNDS,
+                             SEQ_LEN, TEMPERATURE,
                              PENALTY, VOLUME, OSC_ADDRESS, OSC_PORT)
 
 
@@ -32,8 +33,14 @@ from tomomibot.const import (INTERVAL_SEC, INPUT_DEVICE, OUTPUT_CHANNEL,
               default=THRESHOLD_DB,
               help='Ignore audio events under this db value')
 @click.option('--num_classes',
-              default=NUM_CLASSES,
+              default=NUM_CLASSES_SOUNDS,
               help='Number of k-means classes')
+@click.option('--dynamics/--no_dynamics',
+              default=False,
+              help='Use dynamics (volume) classes')
+@click.option('--durations/--no_durations',
+              default=False,
+              help='Use duration classes (length of sound events)')
 @click.option('--seq_len',
               default=SEQ_LEN,
               help='How long is the sequence the model needs to predict')
