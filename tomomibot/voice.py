@@ -55,12 +55,11 @@ class Voice:
                 }
 
                 if self.version == 2:
-                    duration = (
-                        wav['end'] - wav['start']
-                    ) / self.meta['samplerate'] * 1000
+                    sr = self.meta['samplerate']
+                    duration = (wav['end'] - wav['start']) / sr * 1000
 
                     wav_entry['class_dynamic'] = encode_dynamic_class(
-                        None, wav['rms'])
+                        None, wav['rms'] / self.rms_max)
                     wav_entry['class_duration'] = encode_duration_class(
                         duration)
 
