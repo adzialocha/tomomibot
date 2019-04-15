@@ -31,86 +31,76 @@ def encode_duration_class(duration):
     return duration_class
 
 
-def encode_data(data, num_clusters, use_dynamics, use_durations, sr=44100):
-    new_data = []
+def encode_data(sequence, num_clusters, use_dynamics, use_durations, sr):
+    dataset = []
 
-    # KMeans clustering of primary voice PCA data
+    # KMeans clustering of primary voice PCA sequence
     pca_data = []
-    for voice in data:
-        if 'pca' in voice[0]:
-            pca_data.append(voice[0]['pca'])
-
+    for step in sequence:
+        if 'pca' in step[0]:
+            pca_data.append(step[0]['pca'])
     kmeans = KMeans(n_clusters=num_clusters)
     kmeans.fit(pca_data)
 
     # Encode both voices
-    for column in data:
-        new_column = []
-        for step in column:
-            # Get sound class
-            if 'pca' not in step:
+    for step in sequence:
+        new_step = []
+
+        for voice in step:
+            # Define sound class
+            if voice['id'] is None:
                 class_sound = SILENCE_CLASS
             else:
-                # Add +1 to class for silence class
-                class_sound = kmeans.predict([step['pca']])[0] + 1
+                # +1 for silence
+                class_sound = kmeans.predict([voice['pca']])[0] + 1
 
+            # Define dynamic class
+            if use_dynamics:
+                if class_sound == SILENCE_CLASS:
+                    class_dynamic = 0
+                else:
+                    class_dynamic = int(round(
+                        voice['rms_avg'] * (NUM_CLASSES_DYNAMICS - 1)))
+
+            # Define duration class
+            if use_durations:
+                duration = (voice['end'] - voice['start']) / sr * 1000
+                class_duration = encode_duration_class(duration)
+
+            # Define feature vector and matrix
             if not use_dynamics and not use_durations:
-                sequence_step = class_sound
-            else:
-                sequence_step = [
-                    class_sound,
-                ]
-
-                # Get dynamic class
-                if use_dynamics and 'rms_avg' in step:
-                    if class_sound == SILENCE_CLASS:
-                        class_dynamic = 0
-                    else:
-                        class_dynamic = int(round(
-                            step['rms_avg'] * (NUM_CLASSES_DYNAMICS - 1)))
-                    sequence_step.append(class_dynamic)
-
-                # Get duration class
-                if use_durations:
-                    duration = (step['end'] - step['start']) / sr * 1000
-                    class_duration = encode_duration_class(duration)
-                    sequence_step.append(class_duration)
-
-            if not use_dynamics and not use_durations:
+                feature_vector = class_sound
                 feature_matrix = np.zeros((num_clusters + 1))
-            elif use_dynamics and not use_durations:
-                feature_matrix = np.zeros((num_clusters + 1,
-                                           NUM_CLASSES_DYNAMICS))
-            elif not use_dynamics and use_durations:
-                feature_matrix = np.zeros((num_clusters + 1,
-                                           NUM_CLASSES_DURATIONS))
             else:
-                feature_matrix = np.zeros((num_clusters + 1,
-                                           NUM_CLASSES_DYNAMICS,
-                                           NUM_CLASSES_DURATIONS))
+                feature_vector = [class_sound]
+
+                if use_dynamics:
+                    feature_vector.append(class_dynamic)
+
+                if use_durations:
+                    feature_vector.append(class_duration)
+
+                if use_dynamics and not use_durations:
+                    feature_matrix = np.zeros((num_clusters + 1,
+                                               NUM_CLASSES_DYNAMICS))
+                elif not use_dynamics and use_durations:
+                    feature_matrix = np.zeros((num_clusters + 1,
+                                               NUM_CLASSES_DURATIONS))
+                else:
+                    feature_matrix = np.zeros((num_clusters + 1,
+                                               NUM_CLASSES_DYNAMICS,
+                                               NUM_CLASSES_DURATIONS))
 
             # Encode sequence
             if use_dynamics or use_durations:
-                sequence_step = np.ravel_multi_index(sequence_step,
-                                                     feature_matrix.shape)
-                sequence_step = np.array(sequence_step)
+                feature_vector = np.ravel_multi_index(feature_vector,
+                                                      feature_matrix.shape)
+                feature_vector = np.array(feature_vector)
 
-            new_column.append(sequence_step)
+            new_step.append(feature_vector)
 
-        new_data.append(new_column)
-    return np.array(new_data), kmeans
-
-
-def k_means_decode_data(data, kmeans):
-    new_data = []
-    for column in data:
-        new_column = []
-        for cluster_index in column:
-            # -1 to remove silence class
-            center = kmeans.cluster_centers_[cluster_index - 1]
-            new_column.append(center)
-        new_data.append(new_column)
-    return np.array(new_data)
+        dataset.append(new_step)
+    return np.array(dataset)
 
 
 def generator(data, seq_len, min_index, max_index, batch_size):
@@ -136,6 +126,20 @@ def generator(data, seq_len, min_index, max_index, batch_size):
 
 def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
     """Train a LSTM neural network on sequence data from a performance"""
+
+    # Prepare voices
+    primary_voice = Voice(primary_voice)
+    secondary_voice = Voice(secondary_voice)
+
+    if primary_voice.version < 2 or secondary_voice.version < 2:
+        ctx.elog('Given voices were generated with an too old version.')
+
+    sr = primary_voice.meta['samplerate']
+
+    if sr != secondary_voice.meta['samplerate']:
+        ctx.elog('Voices need same samplerates for correct training.')
+
+    # Prepare model
     model_name = '{}.h5'.format(name)
     model_path = os.path.join(os.getcwd(), MODELS_FOLDER, model_name)
     resume = False
@@ -147,9 +151,10 @@ def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
         resume = True
 
     # Parameters and Hyperparameters
+    use_dynamics = kwargs.get('dynamics')
+    use_durations = kwargs.get('durations')
+
     num_sound_classes = kwargs.get('num_classes')
-    use_dynamics = kwargs.get('use_dynamics')
-    use_durations = kwargs.get('use_durations')
     batch_size = kwargs.get('batch_size')
     data_split = kwargs.get('data_split')
     seq_len = kwargs.get('seq_len')
@@ -158,7 +163,8 @@ def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
     num_layers = kwargs.get('num_layers')
     num_units = kwargs.get('num_units')
 
-    num_classes = num_sound_classes + 1
+    # Calculate number of total classes
+    num_classes = num_sound_classes + 1  # .. add silence class
     if use_dynamics:
         num_classes *= NUM_CLASSES_DYNAMICS
     if use_durations:
@@ -178,25 +184,25 @@ def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
     ctx.log(line(length=32))
     ctx.log('')
 
-    primary_voice = Voice(primary_voice)
-    secondary_voice = Voice(secondary_voice)
-
     # Generate training data from voice sequences
     ctx.log(click.style('1. Generate training data from voices', bold=True))
     ctx.log('Primary voice: "{}"'.format(primary_voice.name))
     ctx.log('Secondary voice: "{}"'.format(secondary_voice.name))
 
-    data = generate_sequence(ctx, primary_voice, secondary_voice,
+    data = generate_sequence(ctx,
+                             primary_voice,
+                             secondary_voice,
                              save_sequence=kwargs.get('save_sequence'))
 
     ctx.log('')
 
     # Encode data before training
     ctx.log(click.style('2. Encode data before training', bold=True))
-    encoded_data, kmeans = encode_data(data,
-                                       num_sound_classes,
-                                       use_dynamics,
-                                       use_durations)
+    encoded_data = encode_data(data,
+                               num_sound_classes,
+                               use_dynamics,
+                               use_durations,
+                               sr)
 
     ctx.log('Number of classes: {}\n'.format(num_classes))
 
@@ -297,7 +303,6 @@ def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
 
             if result_class == target_class:
                 score += 1
-
             total += 1
 
     ratio = score / total

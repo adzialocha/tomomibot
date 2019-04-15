@@ -47,8 +47,22 @@ def check_valid_voice(name):
             ONSET_FILE))
 
     with open(voice_data_file) as file:
-        for entry in json.load(file):
-            wav_path = make_wav_path(name, entry['id'])
+        data = json.load(file)
+
+        if 'version' in data:
+            version = data['version']
+        else:
+            version = 1
+
+        if version == 1:
+            sequence = data
+        elif version == 2:
+            sequence = data['sequence']
+        else:
+            raise RuntimeError('Unknow voice version')
+
+        for step in sequence:
+            wav_path = make_wav_path(name, step['id'])
             if not os.path.isfile(wav_path):
                 raise FileNotFoundError(
                     'Could not find wav file "{}" in voice folder'.format(

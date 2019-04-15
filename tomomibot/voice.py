@@ -8,9 +8,6 @@ from tomomibot.const import GENERATED_FOLDER, ONSET_FILE
 from tomomibot.utils import make_wav_path
 
 
-KERNEL_SIZE = 8
-
-
 class Voice:
 
     def __init__(self, name, **kwargs):
@@ -21,28 +18,21 @@ class Voice:
         with open(onset_path) as file:
             data = json.load(file)
 
-            self.data = data
+            if 'version' in data:
+                self.version = data['version']
+            else:
+                self.version = 1  # Add version for legacy releases
 
             # Extract informations from data
-            self.mfccs = [wav['mfcc'] for wav in data]
-            self.wavs = [make_wav_path(name, wav['id']) for wav in data]
-            self.positions = [[int(wav['start']),
-                               int(wav['end'])] for wav in data]
+            if self.version == 1:
+                self.sequence = data
+                self.meta = {}
+            elif self.version == 2:
+                self.sequence = data['sequence']
+                self.meta = data['meta']
 
-            # Do we have information about the sample volumes?
-            self.has_rms = False
-
-            if 'rms' in data[0]:
-                self.has_rms = True
-                rms_data = [wav['rms'] for wav in data]
-
-                # Calculate average volume
-                kernel = np.array(np.full((KERNEL_SIZE,), 1)) / KERNEL_SIZE
-                rms_avg_data = np.convolve(rms_data, kernel, 'same')
-
-                # Normalize rms values and store them
-                self.rms = rms_data / np.max(rms_data)
-                self.rms_avg = rms_avg_data / np.max(rms_avg_data)
+            self.wavs = [
+                make_wav_path(name, wav['id']) for wav in self.sequence]
 
             self.fit()
 
@@ -50,9 +40,12 @@ class Voice:
         if reference_voice is None:
             reference_voice = self
 
+        # Get MFCC data from voice sequence
+        mfccs = [wav['mfcc'] for wav in reference_voice.sequence]
+
         # Calculate PCA
-        _, pca_instance, pca_scaler = pca(reference_voice.mfccs)
-        self.points = pca_instance.transform(self.mfccs)
+        _, pca_instance, pca_scaler = pca(mfccs)
+        self.points = pca_instance.transform(mfccs)
         self._pca_instance = pca_instance
         self._pca_scaler = pca_scaler
 

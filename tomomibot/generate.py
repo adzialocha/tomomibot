@@ -12,6 +12,8 @@ from tomomibot.const import GENERATED_FOLDER, ONSET_FILE
 
 
 SILENCE_DURATION_MIN = 50
+VERSION = 2
+VOLUME_KERNEL_SIZE = 10
 
 
 def generate_voice(ctx, file, name, db_threshold, block):
@@ -38,7 +40,7 @@ def generate_voice(ctx, file, name, db_threshold, block):
 
     counter = 1
     block_no = 0
-    data = []
+    sequence = []
 
     ctx.log('Analyze .wav file "%s" with %i frames and sample rate %i' % (
         click.format_filename(file, shorten=True),
@@ -69,11 +71,11 @@ def generate_voice(ctx, file, name, db_threshold, block):
                 rms = librosa.feature.rms(y=y_slice)
 
                 # Keep all information stored
-                data.append({'id': counter,
-                             'mfcc': mfcc.tolist(),
-                             'rms': np.float32(np.max(rms)).item(),
-                             'start': np.uint32(slices[i][1]).item(),
-                             'end': np.uint32(slices[i][2]).item()})
+                sequence.append({'id': counter,
+                                 'mfcc': mfcc.tolist(),
+                                 'rms': np.float32(np.max(rms)).item(),
+                                 'start': np.uint32(slices[i][1]).item(),
+                                 'end': np.uint32(slices[i][2]).item()})
 
                 # Save file to generated subfolder
                 path = os.path.join(voice_dir, '%i.wav' % counter)
@@ -86,69 +88,83 @@ def generate_voice(ctx, file, name, db_threshold, block):
     ctx.log('Created %i slices' % (counter - 1))
 
     # generate and save data file
+    data = {
+        'version': VERSION,
+        'meta': {
+            'samplerate': sr,
+        },
+        'sequence': sequence,
+    }
+
     data_path = os.path.join(voice_dir, ONSET_FILE)
     with open(data_path, 'w') as file:
         json.dump(data, file, indent=2, separators=(',', ': '))
     ctx.log('saved .json file with analyzed data.')
 
 
-def find_silence(voice, sr=44100):
-    """Find silence in and in-between sound events"""
-    sequence = []
-    last_step = voice.data[0]
-    id_counter = 1
+def generate_dynamics(voice):
+    """Find silence and calculate average volume"""
+    new_sequence = []
 
-    for step_index, step in enumerate(voice.data):
+    last_step = voice.sequence[0]
+    sr = voice.meta['samplerate']
+
+    # Calculate average volume
+    rms_data = [step['rms'] for step in voice.sequence]
+
+    kernel = np.array(np.full((VOLUME_KERNEL_SIZE,), 1)) / VOLUME_KERNEL_SIZE
+    rms_avg_data = np.convolve(rms_data, kernel, 'same')
+
+    # Normalize rms values and store them
+    rms_normalized = rms_data / np.max(rms_data)
+    rms_avg_normalized = rms_avg_data / np.max(rms_avg_data)
+
+    # Find silence in and in-between sound events
+    for step_index, step in enumerate(voice.sequence):
         duration_between = ((step['start'] - last_step['end']) / sr) * 1000
 
         # Add silence between sound events
         if duration_between >= SILENCE_DURATION_MIN:
             silence_step = {
-                'id': id_counter,
+                'id': None,
                 'rms': 0,
                 'rms_avg': 0,
                 'start': last_step['end'],
                 'end': step['start'],
             }
 
-            sequence.append(silence_step)
-
-            id_counter += 1
+            new_sequence.append(silence_step)
 
         converted_step = step.copy()
 
-        # Keep soundfile id
-        converted_step['sound_id'] = step['id']
-        converted_step['id'] = id_counter
+        # Store normalized (average) volumes
+        converted_step['rms'] = rms_normalized[step_index]
+        converted_step['rms_avg'] = rms_avg_normalized[step_index]
 
-        # Store PCA data and average volume
+        # Add PCA data for later training
         converted_step['pca'] = voice.points[step_index]
-        if voice.has_rms:
-            converted_step['rms_avg'] = voice.rms_avg[step_index]
 
-        sequence.append(converted_step)
+        new_sequence.append(converted_step)
 
-        id_counter += 1
         last_step = step
 
-    return sequence
+    return new_sequence
 
 
 def generate_sequence(ctx, voice_primary, voice_secondary,
                       save_sequence=False):
     """Generate a trainable sequence of two voices playing together"""
     sequence = []
-    counter = 0
 
     # Find events
-    steps_primary = find_silence(voice_primary)
+    steps_primary = generate_dynamics(voice_primary)
 
     # Check if voices are the same
     if voice_primary.name == voice_secondary.name:
+        ctx.log('Both voices are the same: generate a solo voice!')
         sequence = [[s, s] for s in steps_primary]
-        counter = len(steps_primary)
     else:
-        steps_secondary = find_silence(voice_secondary)
+        steps_secondary = generate_dynamics(voice_secondary)
 
         # Go through all secondary sound events
         with click.progressbar(length=len(steps_secondary),
@@ -158,26 +174,19 @@ def generate_sequence(ctx, voice_primary, voice_secondary,
                 end = steps_secondary[i]['end']
 
                 # Find a simultaneous sound event in primary voice
-                found_step = None
-                for j, step_primary in reversed(
+                for step_index, step_primary in reversed(
                         list(enumerate(steps_primary))):
-                    start_primary = voice_primary[j]['start']
-                    end_primary = voice_primary[j]['end']
+                    start_primary = steps_primary[step_index]['start']
+                    end_primary = steps_primary[step_index]['end']
 
                     if not (end <= start_primary or start >= end_primary):
-                        found_step = j
-                        counter += 1
+                        # Add played point to other
+                        sequence.append([step_secondary, step_primary])
                         break
-
-                # Add played point to other
-                if found_step:
-                    sequence.append([step_primary, found_step])
 
                 bar.update(1)
 
-    ctx.log('Sequence with {} events and {} targets generated.'.format(
-        len(sequence),
-        counter))
+    ctx.log('Sequence with {} events generated.'.format(len(sequence)))
 
     # ... and save sequence file
     if save_sequence:
