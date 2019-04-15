@@ -36,6 +36,9 @@ def encode_data(sequence, num_clusters, use_dynamics, use_durations, sr):
         new_step = []
 
         for voice in step:
+            class_dynamic = None
+            class_duration = None
+
             # Define sound class
             if voice['id'] is None:
                 class_sound = SILENCE_CLASS

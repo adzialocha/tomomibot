@@ -5,7 +5,19 @@ import numpy as np
 
 from tomomibot.audio import pca
 from tomomibot.const import GENERATED_FOLDER, ONSET_FILE
-from tomomibot.utils import make_wav_path, encode_duration_class
+from tomomibot.utils import (make_wav_path,
+                             encode_duration_class,
+                             encode_dynamic_class)
+
+
+def convert_positions(sequence):
+    # We store frame indexes as strings since they are too large
+    new_sequence = []
+    for step in sequence:
+        step['start'] = int(step['start'])
+        step['end'] = int(step['end'])
+        new_sequence.append(step)
+    return new_sequence
 
 
 class Voice:
@@ -25,11 +37,15 @@ class Voice:
 
             # Extract informations from data
             if self.version == 1:
-                self.sequence = data
+                self.sequence = convert_positions(data)
                 self.meta = {}
+                self.rms_max = 1
             elif self.version == 2:
-                self.sequence = data['sequence']
+                self.sequence = convert_positions(data['sequence'])
                 self.meta = data['meta']
+
+                # Get RMS maximum for normalization
+                self.rms_max = np.max([wav['rms'] for wav in self.sequence])
 
             # Prepare wav file informations for playback
             wavs = []
@@ -40,10 +56,10 @@ class Voice:
 
                 if self.version == 2:
                     duration = (
-                        int(wav['end']) - int(wav['start'])
+                        wav['end'] - wav['start']
                     ) / self.meta['samplerate'] * 1000
 
-                    wav_entry['class_dynamic'] = encode_duration_class(
+                    wav_entry['class_dynamic'] = encode_dynamic_class(
                         None, wav['rms'])
                     wav_entry['class_duration'] = encode_duration_class(
                         duration)

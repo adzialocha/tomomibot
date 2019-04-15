@@ -74,8 +74,8 @@ def generate_voice(ctx, file, name, db_threshold, block):
                 sequence.append({'id': counter,
                                  'mfcc': mfcc.tolist(),
                                  'rms': np.float32(np.max(rms)).item(),
-                                 'start': np.uint32(slices[i][1]).item(),
-                                 'end': np.uint32(slices[i][2]).item()})
+                                 'start': str(slices[i][1]),
+                                 'end': str(slices[i][2])})
 
                 # Save file to generated subfolder
                 path = os.path.join(voice_dir, '%i.wav' % counter)
@@ -138,11 +138,12 @@ def generate_dynamics(voice):
         converted_step = step.copy()
 
         # Store normalized (average) volumes
-        converted_step['rms'] = rms_normalized[step_index]
-        converted_step['rms_avg'] = rms_avg_normalized[step_index]
+        converted_step['rms'] = np.float32(rms_normalized[step_index]).item()
+        converted_step['rms_avg'] = np.float32(
+            rms_avg_normalized[step_index]).item()
 
         # Add PCA data for later training
-        converted_step['pca'] = voice.points[step_index]
+        converted_step['pca'] = voice.points[step_index].tolist()
 
         new_sequence.append(converted_step)
 

@@ -235,7 +235,7 @@ class Session():
                     'Not enough sample data for MFCC analysis')
             else:
                 # Calculate RMS
-                rms_data = librosa.feature.rms(y=y_slice)
+                rms_data = librosa.feature.rms(y=y_slice) / self._voice.rms_max
                 rms = np.float32(np.max(rms_data)).item()
 
                 # Project point into given voice PCA space
@@ -295,6 +295,8 @@ class Session():
                     self.num_sound_classes,
                     self.use_dynamics,
                     self.use_durations)
+
+                self.ctx.vlog(result_class)
 
                 self.ctx.vlog('sound={} dynamic={} duration={}'.format(
                     class_sound, class_dynamic, class_duration))
