@@ -1,3 +1,4 @@
+import random
 import signal
 import sys
 import threading
@@ -47,13 +48,22 @@ class Runtime:
             time.sleep(1)
 
     def _display_welcome(self):
-        self.ctx.log("""
+        welcome = """
 ▄▄▄▄▄      • ▌ ▄ ·.       • ▌ ▄ ·. ▪  ▄▄▄▄·      ▄▄▄▄▄
 •██  ▪     ·██ ▐███▪▪     ·██ ▐███▪██ ▐█ ▀█▪▪    •██
  ▐█.▪ ▄█▀▄ ▐█ ▌▐▌▐█· ▄█▀▄ ▐█ ▌▐▌▐█·▐█·▐█▀▀█▄ ▄█▀▄ ▐█.▪
  ▐█▌·▐█▌.▐▌██ ██▌▐█▌▐█▌.▐▌██ ██▌▐█▌▐█▌██▄▪▐█▐█▌.▐▌▐█▌·
  ▀▀▀  ▀█▄▀▪▀▀  █▪▀▀▀ ▀█▄▀▪▀▀  █▪▀▀▀▀▀▀·▀▀▀▀  ▀█▄▀▪▀▀▀
-        """)
+        """
+        for line in welcome.split('\n'):
+            self.ctx.log(click.style(line, fg=random.choice([
+                'blue',
+                'cyan',
+                'green',
+                'magenta',
+                'red',
+                'yellow',
+            ])))
         self.ctx.log('Version: %s' % __version__)
         self.ctx.log('Exit with [CTRL] + [C]\n')
 
