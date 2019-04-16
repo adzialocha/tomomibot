@@ -164,7 +164,8 @@ class Session():
         while self.is_running:
             time.sleep(self._interval)
             if self.is_running:
-                self.tick()
+                with self._lock:
+                    self.tick()
 
     def play(self):
         while self.is_running:
@@ -296,8 +297,8 @@ class Session():
                     self.use_dynamics,
                     self.use_durations)
 
-                # Do not do anything when this is silence ..
-                if class_sound != SILENCE_CLASS:
+                # Version >1: Do not do anything when this is silence
+                if self._voice.version == 1 or class_sound != SILENCE_CLASS:
                     # Find closest sound to this point
                     wav = self._voice.find_wav(self._point_classes,
                                                class_sound,
