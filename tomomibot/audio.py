@@ -73,13 +73,10 @@ def mfcc_features(y, sr, n_mels=128, n_mfcc=13):
 
 
 def slice_audio(y, onsets, sr=44100, offset=0, top_db=5,
-                min_ms=None):
+                trim=True):
     frames = []
 
-    if not min_ms:
-        min_frames = (sr // 1000) * MIN_SAMPLE_MS
-    else:
-        min_frames = (sr // 1000) * min_ms
+    min_frames = (sr // 1000) * MIN_SAMPLE_MS
 
     for i in range(len(onsets) - 1):
         # Take audio from onset start to next onset
@@ -90,20 +87,23 @@ def slice_audio(y, onsets, sr=44100, offset=0, top_db=5,
         if onset_end - onset_start < min_frames:
             continue
 
-        # Trim silence
-        y_trim, trim_indexes = librosa.effects.trim(y[onset_start:onset_end],
-                                                    ref=np.mean,
-                                                    top_db=top_db)
+        if trim:
+            # Trim silence
+            y_trim, trim_indexes = librosa.effects.trim(
+                y[onset_start:onset_end], ref=np.mean, top_db=top_db)
 
-        if len(y_trim) < min_frames:
-            continue
+            if len(y_trim) < min_frames:
+                continue
 
-        # Set new slice relative to onset position
-        start = onset_start + trim_indexes[0]
-        end = onset_start + trim_indexes[1]
+            # Set new slice relative to onset position
+            start = onset_start + trim_indexes[0]
+            end = onset_start + trim_indexes[1]
 
-        if end - start < min_frames:
-            continue
+            if end - start < min_frames:
+                continue
+        else:
+            start = onset_start
+            end = onset_end
 
         frames.append([y[start:end], start + offset, end + offset])
 

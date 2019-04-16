@@ -218,7 +218,7 @@ class Session():
         if len(onsets) == 0 and not is_silent(frames, self.threshold_db):
             slices = [[frames, 0, 0]]
         else:
-            slices = slice_audio(frames, onsets, top_db=1)
+            slices = slice_audio(frames, onsets, trim=False)
 
         self.ctx.vlog('{} onsets detected & {} slices generated'.format(
             len(onsets), len(slices)))

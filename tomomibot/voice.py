@@ -77,7 +77,8 @@ class Voice:
         mfccs = [wav['mfcc'] for wav in reference_voice.sequence]
 
         # Calculate PCA
-        _, pca_instance, pca_scaler = pca(mfccs)
+        n_components = 6 if self.version == 2 else 2
+        _, pca_instance, pca_scaler = pca(mfccs, components=n_components)
         self.points = pca_instance.transform(mfccs)
         self._pca_instance = pca_instance
         self._pca_scaler = pca_scaler
