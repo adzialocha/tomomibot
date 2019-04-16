@@ -123,6 +123,9 @@ def encode_dynamic_class(class_sound, rms):
     else:
         class_dynamic = int(round(rms * (NUM_CLASSES_DYNAMICS - 1)))
 
+    if class_dynamic > NUM_CLASSES_DYNAMICS - 1:
+        class_dynamic = NUM_CLASSES_DYNAMICS - 1
+
     return class_dynamic
 
 
@@ -131,13 +134,13 @@ def encode_feature_vector(num_sound_classes, class_sound,
                           use_dynamics=False, use_durations=False):
     """Translate sound, dynamic and duration classes into an indexed class"""
     # Define feature vector and matrix
-    feature_matrix = get_feature_matrix(num_sound_classes,
-                                        use_dynamics,
-                                        use_durations)
-
     if not use_dynamics and not use_durations:
         feature_vector = class_sound
     else:
+        feature_matrix = get_feature_matrix(num_sound_classes,
+                                            use_dynamics,
+                                            use_durations)
+
         feature_vector = [class_sound]
 
         if use_dynamics:
@@ -168,16 +171,17 @@ def decode_classes(class_index, num_sound_classes,
                                             use_dynamics,
                                             use_durations)
 
-        feature_vector = np.unravel_index([class_index], feature_matrix)[0]
+        feature_vector = np.unravel_index([class_index],
+                                          feature_matrix.shape)
 
-        class_sound = feature_vector[0]
+        class_sound = feature_vector[0][0]
 
         if use_dynamics and not use_durations:
-            class_dynamic = feature_vector[1]
+            class_dynamic = feature_vector[1][0]
         elif not use_dynamics and use_durations:
-            class_duration = feature_vector[1]
+            class_duration = feature_vector[1][0]
         else:
-            class_dynamic = feature_vector[1]
-            class_duration = feature_vector[2]
+            class_dynamic = feature_vector[1][0]
+            class_duration = feature_vector[2][0]
 
     return class_sound, class_dynamic, class_duration
