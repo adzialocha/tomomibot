@@ -253,11 +253,16 @@ def train_sequence_model(ctx, primary_voice, secondary_voice, name, **kwargs):
 
     # Training!
     ctx.log(click.style('5. Training!', bold=True))
-    model.fit_generator(train_gen,
-                        steps_per_epoch=steps_per_epoch,
-                        epochs=epochs,
-                        validation_data=val_gen,
-                        validation_steps=validation_steps)
+    if len(validation_steps) == 0:
+        model.fit_generator(train_gen,
+                            steps_per_epoch=steps_per_epoch,
+                            epochs=epochs)
+    else:
+        model.fit_generator(train_gen,
+                            steps_per_epoch=steps_per_epoch,
+                            epochs=epochs,
+                            validation_data=val_gen,
+                            validation_steps=validation_steps)
     ctx.log('Finished training.\n')
 
     # Evaluate training
