@@ -72,9 +72,14 @@ def mfcc_features(y, sr, n_mels=128, n_mfcc=13):
     return feature_vector
 
 
-def slice_audio(y, onsets, sr=44100, offset=0, top_db=5):
+def slice_audio(y, onsets, sr=44100, offset=0, top_db=5,
+                min_ms=None):
     frames = []
-    min_frames = (sr // 1000) * MIN_SAMPLE_MS
+
+    if not min_ms:
+        min_frames = (sr // 1000) * MIN_SAMPLE_MS
+    else:
+        min_frames = (sr // 1000) * min_ms
 
     for i in range(len(onsets) - 1):
         # Take audio from onset start to next onset
