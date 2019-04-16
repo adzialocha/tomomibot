@@ -178,7 +178,7 @@ class Session():
 
                 self.ctx.vlog(
                     '▶ play .wav sample "{}" (queue={}, density={})'.format(
-                        wav,
+                        os.path.basename(wav),
                         len(self._wavs),
                         self._density))
 
@@ -296,11 +296,6 @@ class Session():
                     self.use_dynamics,
                     self.use_durations)
 
-                self.ctx.vlog(result_class)
-
-                self.ctx.vlog('sound={} dynamic={} duration={}'.format(
-                    class_sound, class_dynamic, class_duration))
-
                 # Do not do anything when this is silence ..
                 if class_sound != SILENCE_CLASS:
                     # Find closest sound to this point
@@ -308,6 +303,12 @@ class Session():
                                                class_sound,
                                                class_dynamic,
                                                class_duration)
+
+                    smiley = '☺' if wav else '☹'
+                    self.ctx.vlog('{} find sound (class={}, '
+                                  'dynamic={}, duration={})'.format(
+                                      smiley, class_sound, class_dynamic,
+                                      class_duration))
 
                     if wav:
                         self._wavs.append(wav)
