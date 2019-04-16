@@ -70,10 +70,15 @@ class Runtime:
     def _subscribe_events(self):
         @self._server.emitter.on('reset')
         def on_reset():
+            self.ctx.vlog('[OSC] reset received')
+
             self._session.reset_sequence()
 
         @self._server.emitter.on('param')
         def on_param(param_key, param_value):
+            self.ctx.vlog('[OSC] {} = {}'.format(param_key,
+                                                 param_value))
+
             if param_key == 'volume':
                 self._session.master_volume = param_value
             elif param_key == 'temperature':
