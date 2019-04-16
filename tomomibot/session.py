@@ -304,11 +304,13 @@ class Session():
                                                class_dynamic,
                                                class_duration)
 
-                    smiley = '☺' if wav else '☹'
-                    self.ctx.vlog('{} find sound (class={}, '
-                                  'dynamic={}, duration={})'.format(
-                                      smiley, class_sound, class_dynamic,
-                                      class_duration))
+                    # Only show this when able to work with dynamics etc.
+                    if self._voice.version == 2:
+                        smiley = '☺' if wav else '☹'
+                        self.ctx.vlog('{} find sound (class={}, '
+                                      'dynamic={}, duration={})'.format(
+                                          smiley, class_sound, class_dynamic,
+                                          class_duration))
 
                     if wav:
                         self._wavs.append(wav)
