@@ -94,6 +94,9 @@ class Voice:
         indices = point_classes[class_sound]
         possible_wavs = self.wavs[indices]
 
+        if len(possible_wavs) == 0:
+            return None
+
         if self.version == 2:
             # Filter by dynamic class
             if class_dynamic:
