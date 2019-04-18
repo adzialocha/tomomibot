@@ -284,6 +284,8 @@ class Session():
 
                 # Predict next action via model
                 result = self._model.predict(np.array([sequence_slice]))
+                if np.sum(result) == 0:
+                    break
 
                 # Reweight the softmax distribution
                 result_reweighted = reweight_distribution(result,
