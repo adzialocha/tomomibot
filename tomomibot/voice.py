@@ -107,8 +107,9 @@ class Voice:
                     filter(lambda x: x['class_duration'] == class_duration,
                            possible_wavs))
 
+        # Fallback when we could not find anything
         if len(possible_wavs) == 0:
-            return None
+            possible_wavs = self.wavs[indices]
 
         # Pick a random sound from that group
         wav = np.random.choice(possible_wavs)
