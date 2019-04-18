@@ -53,7 +53,7 @@ def mfcc_features(y, sr, n_mels=128, n_mfcc=13):
                                 n_mfcc=n_mfcc)
 
     if mfcc.shape[-1] < DELTA_WIDTH:
-        raise ValueError('MFCC vector does not contain enough time steps')
+        raise RuntimeError('MFCC vector does not contain enough time steps')
 
     if not mfcc.any():
         return np.zeros(n_mfcc * 3)
