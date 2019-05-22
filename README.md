@@ -41,3 +41,7 @@ Commands:
 ### Known issues
 
 * `error during recording: -10863` (MacOS): Selected samplerate differs from the one of your recording device, change it via the `--samplerate` argument of the `start` command.
+
+### License
+
+`MIT`
